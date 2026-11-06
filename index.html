@@ -1,0 +1,3024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QTCP Field Logger - Marine Turtle Nesting Capture</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom Theme Overrides */
+    :root {
+      --bg-primary: #0a0f1d;
+      --bg-secondary: #131b2e;
+      --bg-card: #1c2742;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --accent: #0ea5e9;
+      --accent-glow: rgba(14, 165, 233, 0.25);
+      --border: #334155;
+      --btn-active: #0284c7;
+    }
+
+    body.theme-red {
+      --bg-primary: #000000;
+      --bg-secondary: #0d0000;
+      --bg-card: #1a0202;
+      --text-main: #ff4d4d;
+      --text-muted: #b32424;
+      --accent: #ff1a1a;
+      --accent-glow: rgba(255, 26, 26, 0.3);
+      --border: #4d0505;
+      --btn-active: #cc0000;
+      color: var(--text-main);
+      background-color: var(--bg-primary);
+    }
+
+    body.theme-day {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-card: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --accent: #0284c7;
+      --accent-glow: rgba(2, 132, 199, 0.15);
+      --border: #cbd5e1;
+      --btn-active: #0369a1;
+      color: var(--text-main);
+      background-color: var(--bg-primary);
+    }
+
+    body.theme-dark {
+      --bg-primary: #0b1120;
+      --bg-secondary: #111c35;
+      --bg-card: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --border: #334155;
+      --btn-active: #0284c7;
+      color: var(--text-main);
+      background-color: var(--bg-primary);
+    }
+
+    /* Print and Paper View Styles */
+    @media print {
+      body { background: white !important; color: black !important; }
+      .no-print { display: none !important; }
+      .paper-sheet { border: none !important; box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
+    }
+
+    .paper-sheet {
+      background: #ffffff;
+      color: #000000;
+      font-family: Arial, Helvetica, sans-serif;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+    .paper-border { border: 1.5px solid #000; }
+    .paper-border-b { border-bottom: 1.5px solid #000; }
+    .paper-border-r { border-right: 1.5px solid #000; }
+    .paper-border-t { border-top: 1.5px solid #000; }
+    .paper-border-l { border-left: 1.5px solid #000; }
+
+    /* SVG Anatomy Interaction */
+    .turtle-part {
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .turtle-part:hover {
+      filter: brightness(1.25);
+    }
+    .turtle-part.active-damage {
+      fill: #ef4444 !important;
+      stroke: #b91c1c !important;
+      stroke-width: 3 !important;
+    }
+    .turtle-part.active-commensal {
+      fill: #eab308 !important;
+      stroke: #a16207 !important;
+      stroke-width: 3 !important;
+    }
+    .turtle-part.active-both {
+      fill: #f97316 !important;
+      stroke: #c2410c !important;
+      stroke-width: 3 !important;
+    }
+
+    /* Custom Stepper & Tap targets */
+    .touch-target {
+      min-height: 48px;
+    }
+  </style>
+</head>
+<body class="theme-red font-sans antialiased min-h-screen transition-colors duration-200">
+
+  <!-- Top App Navigation & Mode Switcher -->
+  <header class="no-print border-b sticky top-0 z-50 backdrop-blur-md" style="background-color: var(--bg-secondary); border-color: var(--border);">
+    <div class="max-w-6xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Project Badge -->
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center font-black text-xl shadow-lg" style="background-color: var(--accent); color: var(--bg-primary);">
+          🐢
+        </div>
+        <div>
+          <div class="text-xs font-semibold tracking-wider uppercase opacity-80">Queensland Turtle Conservation</div>
+          <h1 class="text-base sm:text-lg font-bold leading-none">MR26 Field Logger <span class="text-xs px-2 py-0.5 rounded-full font-mono font-medium ml-1" style="background-color: var(--bg-card); border: 1px solid var(--border);">v2.6 WC</span></h1>
+        </div>
+      </div>
+
+      <!-- Center: View Mode Switcher (Field Flow vs Paper Audit) -->
+      <div class="flex items-center rounded-lg p-1 text-xs font-semibold" style="background-color: var(--bg-primary); border: 1px solid var(--border);">
+        <button id="btnViewFlow" class="px-3 py-1.5 rounded-md flex items-center space-x-1 transition-all" style="background-color: var(--btn-active); color: #ffffff;">
+          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
+          <span>Field Flow (Mobile)</span>
+        </button>
+        <button id="btnViewPaper" class="px-3 py-1.5 rounded-md flex items-center space-x-1 opacity-75 hover:opacity-100 transition-all">
+          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+          <span>Datasheet View (Audit)</span>
+        </button>
+      </div>
+
+      <!-- Right: Environmental Theme Toggle, Actions & Shift Counter -->
+      <div class="flex items-center space-x-2">
+        <!-- New Blank Entry Quick Button -->
+        <button id="btnNewBlankRecord" class="px-2.5 py-1.5 rounded-lg text-xs font-bold border flex items-center space-x-1 transition-all" style="background-color: var(--bg-card); border-color: var(--accent); color: var(--text-main);" title="Start fresh with a clean, blank sheet">
+          <span>✨ New Blank Entry</span>
+        </button>
+
+        <!-- Theme Selectors -->
+        <div class="flex items-center rounded-lg p-0.5 text-xs font-medium" style="background-color: var(--bg-card); border: 1px solid var(--border);" title="Select Lighting Profile">
+          <button id="btnThemeRed" class="px-2 py-1 rounded flex items-center font-bold" style="background-color: #ff1a1a; color: #000;" title="Turtle-Safe Red Night Mode (Preserves Scotopic Vision)">
+            🔴 Red
+          </button>
+          <button id="btnThemeDark" class="px-2 py-1 rounded opacity-75 hover:opacity-100" title="OLED Dark Mode">
+            🌙 Dark
+          </button>
+          <button id="btnThemeDay" class="px-2 py-1 rounded opacity-75 hover:opacity-100" title="Daylight Mode">
+            ☀️ Day
+          </button>
+        </div>
+
+        <!-- Shift CSV Records Badge -->
+        <button id="btnOpenCsvLog" class="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-medium border cursor-pointer hover:opacity-100 transition-all" style="background-color: var(--bg-card); border-color: var(--border);" title="Click to view all saved clutch records for this shift">
+          <span class="w-2 h-2 rounded-full animate-pulse" style="background-color: #22c55e;"></span>
+          <span id="shiftCountBadge" class="font-bold">0 In Log</span>
+        </button>
+
+        <!-- Hidden sync status text element retained for compatibility -->
+        <span id="syncStatusText" class="hidden">Offline Ready</span>
+
+        <!-- Export / Action Menu -->
+        <button id="btnExportMenu" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center" style="background-color: var(--bg-card); border: 1px solid var(--border);">
+          <span>Export ▾</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- In-App Toast Notification -->
+  <div id="appToast" class="hidden fixed top-16 right-4 z-50 max-w-sm p-3.5 rounded-xl shadow-2xl border text-xs font-semibold transition-all duration-300" style="background-color: var(--bg-secondary); border-color: var(--accent); color: var(--text-main);">
+    <div class="flex items-center space-x-2">
+      <span id="toastIcon">ℹ️</span>
+      <span id="toastMessage">Notification message</span>
+    </div>
+  </div>
+
+  <!-- THEME-SAFE LOCALITY PICKER MODAL (Strictly respects Red Night Mode) -->
+  <div id="localityModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black bg-opacity-80 backdrop-blur-sm">
+    <div class="w-full max-w-md rounded-2xl p-4 sm:p-5 shadow-2xl max-h-[85vh] flex flex-col" style="background-color: var(--bg-secondary); border: 2px solid var(--border);">
+      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border);">
+        <h3 class="font-bold text-base flex items-center">
+          <span class="mr-2">📍</span> Select Monitoring Locality
+        </h3>
+        <button id="btnCloseLocalityModal" class="p-1 rounded text-xl opacity-75 hover:opacity-100">&times;</button>
+      </div>
+      <p class="text-xs opacity-75 my-2">Night-vision safe picker (pure red on black, zero white screen flashes).</p>
+      <div class="overflow-y-auto space-y-2 py-2 flex-1" id="localityOptionsList">
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Woongarra Coast - Innes Park Main" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>
+            <div>Woongarra Coast - Innes Park Main</div>
+            <div class="text-[11px] opacity-70 font-normal">Main beach / creek entrance monitoring zone</div>
+          </div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Woongarra Coast - Innes Park KB (Kalina Beach)" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>
+            <div>Woongarra Coast - Innes Park KB (Kalina Beach)</div>
+            <div class="text-[11px] opacity-70 font-normal">Kalina Beach patrol sector</div>
+          </div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Mon Repos Beach" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>
+            <div>Mon Repos Beach</div>
+            <div class="text-[11px] opacity-70 font-normal">Primary Woongarra Coast rookery</div>
+          </div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Woongarra Coast - Bargara" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>
+            <div>Woongarra Coast - Bargara</div>
+            <div class="text-[11px] opacity-70 font-normal">Kellys Beach, Neilson Park, Rifle Range</div>
+          </div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Woongarra Coast - Burnett Heads" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>
+            <div>Woongarra Coast - Burnett Heads</div>
+            <div class="text-[11px] opacity-70 font-normal">Oaks Beach and South Head</div>
+          </div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Woongarra Coast - Elliott Heads" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>
+            <div>Woongarra Coast - Elliott Heads</div>
+            <div class="text-[11px] opacity-70 font-normal">River mouth and Dr Mays Island area</div>
+          </div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Moore Park" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>Moore Park Beach</div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="K'gari (Fraser Island)" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>K'gari (Fraser Island)</div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Wreck Rock" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>Wreck Rock</div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Raine Island" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>Raine Island</div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Heron Island" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>Heron Island</div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+        <button type="button" class="loc-opt-btn w-full p-3 rounded-xl border text-left font-bold text-sm flex items-center justify-between transition-all" data-loc="Other" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div>Other (specify in notes)</div>
+          <span class="loc-check hidden font-bold text-base">✓</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHIFT CSV DATABASE & LOG DRAWER -->
+  <div id="csvLogModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black bg-opacity-80 backdrop-blur-sm">
+    <div class="w-full max-w-3xl rounded-2xl p-5 shadow-2xl max-h-[90vh] flex flex-col" style="background-color: var(--bg-secondary); border: 2px solid var(--border);">
+      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border);">
+        <div>
+          <h3 class="font-bold text-base flex items-center">
+            <span class="mr-2">📊</span> Shift CSV Dataset &amp; Clutch Registry
+          </h3>
+          <p class="text-xs opacity-75">Accumulates all nesting encounters recorded during this beach patrol.</p>
+        </div>
+        <button id="btnCloseCsvLog" class="p-1 rounded text-xl opacity-75 hover:opacity-100">&times;</button>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="py-3 flex flex-wrap items-center gap-2 border-b" style="border-color: var(--border);">
+        <button id="btnDownloadShiftCsv" class="px-4 py-2 rounded-lg font-bold text-xs flex items-center space-x-1.5" style="background-color: var(--btn-active); color: #fff;">
+          <span>💾 Download Consolidated CSV</span>
+        </button>
+        <button id="btnCopyCsvText" class="px-3.5 py-2 rounded-lg font-bold text-xs border" style="background-color: var(--bg-card); border-color: var(--border);">
+          <span>📋 Copy CSV to Clipboard</span>
+        </button>
+        <button id="btnClearShiftLog" class="px-3 py-2 rounded-lg font-bold text-xs border opacity-75 hover:opacity-100" style="background-color: var(--bg-card); border-color: var(--border);">
+          Clear Shift Log
+        </button>
+      </div>
+
+      <!-- Table / Preview Tab Switcher -->
+      <div class="py-2 flex items-center space-x-2 text-xs font-bold">
+        <button id="btnTabRecordsTable" class="px-3 py-1 rounded" style="background-color: var(--btn-active); color: #fff;">Table View</button>
+        <button id="btnTabRawCsv" class="px-3 py-1 rounded opacity-75" style="background-color: var(--bg-card);">Raw CSV String</button>
+      </div>
+
+      <!-- Content View: Table -->
+      <div id="panelRecordsTable" class="flex-1 overflow-auto py-2">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="border-b font-bold" style="border-color: var(--border); background-color: var(--bg-card);">
+              <th class="p-2">#</th>
+              <th class="p-2">Time</th>
+              <th class="p-2">Locality</th>
+              <th class="p-2">Species</th>
+              <th class="p-2">Tag No</th>
+              <th class="p-2">Act</th>
+              <th class="p-2">Eggs</th>
+              <th class="p-2">GPS</th>
+            </tr>
+          </thead>
+          <tbody id="csvRecordsTableBody" class="divide-y" style="border-color: var(--border);">
+            <!-- Rows dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Content View: Raw CSV -->
+      <div id="panelRawCsv" class="hidden flex-1 overflow-auto py-2">
+        <textarea id="rawCsvTextarea" readonly class="w-full h-56 p-3 rounded-lg font-mono text-xs focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);"></textarea>
+      </div>
+    </div>
+  </div>
+
+    <!-- DUPLICATE RECORD CONFIRMATION MODAL -->
+  <div id="duplicateModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black bg-opacity-80 backdrop-blur-sm">
+    <div class="w-full max-w-md rounded-2xl p-5 shadow-2xl flex flex-col" style="background-color: var(--bg-secondary); border: 2px solid var(--border);">
+      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border);">
+        <h3 class="font-bold text-base flex items-center text-amber-400">
+          <span class="mr-2">⚠️</span> Entry Already in CSV Log
+        </h3>
+        <button id="btnCloseDuplicateModal" class="p-1 rounded text-xl opacity-75 hover:opacity-100">&times;</button>
+      </div>
+      
+      <div class="py-4 space-y-3 text-xs leading-relaxed">
+        <p>
+          This nesting record has already been committed to your shift database (<span id="dupRecordIdLabel" class="font-mono font-bold text-sky-400">REC-001</span>).
+        </p>
+        <p class="opacity-80">
+          Do you want to update and replace the existing CSV entry with your current changes, or discard your recent changes?
+        </p>
+      </div>
+
+      <div class="pt-3 border-t flex items-center justify-end space-x-3" style="border-color: var(--border);">
+        <button type="button" id="btnDiscardReplaceRecord" class="px-4 py-2 rounded-xl text-xs font-bold border opacity-80 hover:opacity-100" style="background-color: var(--bg-card); border-color: var(--border);">
+          Discard / Cancel
+        </button>
+        <button type="button" id="btnConfirmReplaceRecord" class="px-4 py-2 rounded-xl text-xs font-bold shadow-lg" style="background-color: var(--btn-active); color: #ffffff;">
+          OK - Replace Entry
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRINTABLE DATASHEET MODAL (Direct in-page fallback for sandboxed print restrictions) -->
+  <div id="printableModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black bg-opacity-80 backdrop-blur-sm">
+    <div class="w-full max-w-2xl rounded-2xl p-5 shadow-2xl flex flex-col" style="background-color: var(--bg-secondary); border: 2px solid var(--border);">
+      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border);">
+        <h3 class="font-bold text-base flex items-center">
+          <span class="mr-2">🖨️</span> Print / Save MR26 Datasheet
+        </h3>
+        <button id="btnClosePrintableModal" class="p-1 rounded text-xl opacity-75 hover:opacity-100">&times;</button>
+      </div>
+      
+      <div class="py-4 space-y-4 text-xs">
+        <div class="p-3.5 rounded-xl border leading-relaxed" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div class="font-bold text-sm mb-1 text-sky-400">Browser Security Notice:</div>
+          <p class="opacity-80">
+            Because this prototype runs inside a sandboxed iframe, your browser may restrict direct <code class="font-mono">window.print()</code> dialogs. We provide two reliable methods to print or save the exact QTCP A4 datasheet:
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button id="btnDownloadPrintableHtml" class="p-4 rounded-xl border text-left flex flex-col justify-between font-bold" style="background-color: var(--bg-card); border-color: var(--accent);">
+            <div>
+              <div class="text-sm mb-1 text-sky-400">📄 Download Standalone Sheet (.html)</div>
+              <div class="text-[11px] font-normal opacity-80">
+                Saves a self-contained, pre-filled printable HTML file. Double-click it on any computer or tablet to print directly or save as PDF without restrictions.
+              </div>
+            </div>
+            <div class="mt-3 text-xs text-sky-400">Download File ➜</div>
+          </button>
+
+          <button id="btnAttemptDirectPrint" class="p-4 rounded-xl border text-left flex flex-col justify-between font-bold" style="background-color: var(--bg-card); border-color: var(--border);">
+            <div>
+              <div class="text-sm mb-1">🖨️ Try Direct Browser Print</div>
+              <div class="text-[11px] font-normal opacity-80">
+                Attempts native print trigger. If your browser permits iframe printing, the standard system print dialog will open immediately.
+              </div>
+            </div>
+            <div class="mt-3 text-xs opacity-75">Send to Printer ➜</div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Dropdown Modal / Drawer -->
+  <div id="exportModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-70 backdrop-blur-sm">
+    <div class="w-full max-w-md rounded-xl p-5 shadow-2xl" style="background-color: var(--bg-secondary); border: 2px solid var(--border);">
+      <div class="flex items-center justify-between pb-3 border-b" style="border-color: var(--border);">
+        <h3 class="font-bold text-base flex items-center">
+          <span class="mr-2">💾</span> Data Export &amp; Interoperability
+        </h3>
+        <button id="btnCloseExport" class="p-1 rounded text-lg opacity-75 hover:opacity-100">&times;</button>
+      </div>
+      <div class="py-4 space-y-3 text-sm">
+        <p class="text-xs opacity-80">
+          The field logger maintains strict 1:1 schema compatibility with the official QTCP paper datasheet and TURDATA database records.
+        </p>
+        <button id="btnCommitCurrentToCsv" class="w-full py-2.5 px-4 rounded-lg font-medium text-left flex items-center justify-between" style="background-color: var(--btn-active); color: #fff;">
+          <div>
+            <div class="font-bold">Commit Current Record to Shift CSV</div>
+            <div class="text-xs opacity-80">Appends this nest to your shift database</div>
+          </div>
+          <span>➕</span>
+        </button>
+        <button id="btnExportCSV" class="w-full py-2.5 px-4 rounded-lg font-medium text-left flex items-center justify-between" style="background-color: var(--bg-card); border: 1px solid var(--border);">
+          <div>
+            <div class="font-bold">Export BioCollect / QTCP CSV</div>
+            <div class="text-xs opacity-70">Single-row tabular record for legacy spreadsheet import</div>
+          </div>
+          <span>➜</span>
+        </button>
+        <button id="btnExportJSON" class="w-full py-2.5 px-4 rounded-lg font-medium text-left flex items-center justify-between" style="background-color: var(--bg-card); border: 1px solid var(--border);">
+          <div>
+            <div class="font-bold">Export JSON Payload</div>
+            <div class="text-xs opacity-70">Complete structured schema for API &amp; cloud sync</div>
+          </div>
+          <span>➜</span>
+        </button>
+        <button id="btnPrintPDF" class="w-full py-2.5 px-4 rounded-lg font-medium text-left flex items-center justify-between" style="background-color: var(--bg-card); border: 1px solid var(--border);">
+          <div>
+            <div class="font-bold">Print / Save Physical Datasheet (PDF)</div>
+            <div class="text-xs opacity-70">Generates exact paper replica for physical archiving</div>
+          </div>
+          <span>🖨️</span>
+        </button>
+        <button id="btnLoadSample" class="w-full py-2 px-4 rounded-lg font-medium text-center text-xs opacity-90" style="background-color: var(--bg-card); border: 1px dashed var(--border);">
+          Load Verified Mon Repos Sample Nesting Event
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-5xl mx-auto p-3 sm:p-6 pb-28">
+
+    <!-- ============================================================== -->
+    <!-- VIEW A: FIELD FLOW (MOBILE-OPTIMIZED CHRONOLOGICAL STEPPER)   -->
+    <!-- ============================================================== -->
+    <div id="viewFlow" class="space-y-6">
+
+      <!-- Step Progress Header -->
+      <div class="no-print rounded-xl p-3 sm:p-4 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+        <div class="flex items-center justify-between text-xs font-semibold mb-2">
+          <span id="stepBadge" class="uppercase tracking-wide opacity-80">Phase 1 of 6</span>
+          <span id="stepTitle" class="font-bold text-sm">Encounter &amp; Event</span>
+        </div>
+        <!-- Progress Bar -->
+        <div class="w-full h-2 rounded-full overflow-hidden" style="background-color: var(--bg-card);">
+          <div id="stepProgressBar" class="h-full transition-all duration-300" style="width: 16.66%; background-color: var(--accent);"></div>
+        </div>
+        <!-- Step Navigation Pills (Scrollable on small mobile) -->
+        <div class="flex items-center space-x-1.5 mt-3 overflow-x-auto pb-1 text-xs font-medium no-scrollbar">
+          <button class="step-pill px-2.5 py-1 rounded-md whitespace-nowrap" data-step="1" style="background-color: var(--btn-active); color: #fff;">1. Encounter</button>
+          <button class="step-pill px-2.5 py-1 rounded-md whitespace-nowrap opacity-70 hover:opacity-100" data-step="2">2. Turtle ID</button>
+          <button class="step-pill px-2.5 py-1 rounded-md whitespace-nowrap opacity-70 hover:opacity-100" data-step="3">3. Anatomy &amp; Health</button>
+          <button class="step-pill px-2.5 py-1 rounded-md whitespace-nowrap opacity-70 hover:opacity-100" data-step="4">4. Nest &amp; Habitat</button>
+          <button class="step-pill px-2.5 py-1 rounded-md whitespace-nowrap opacity-70 hover:opacity-100" data-step="5">5. Mapping &amp; Clutch</button>
+          <button class="step-pill px-2.5 py-1 rounded-md whitespace-nowrap opacity-70 hover:opacity-100" data-step="6">6. Review &amp; Sign-off</button>
+        </div>
+      </div>
+
+      <!-- FORM ROOT -->
+      <form id="qtcpForm" onsubmit="return false;" class="space-y-6">
+
+        <!-- ----------------------------------------------------------- -->
+        <!-- STEP 1: ENCOUNTER & BEACH METADATA                          -->
+        <!-- ----------------------------------------------------------- -->
+        <div id="stepSection1" class="step-section space-y-4">
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-lg font-bold mb-4 flex items-center">
+              <span class="mr-2">📍</span> Beach Encounter &amp; Sector Details
+            </h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              
+              <!-- Locality: Custom Red-Safe Button Trigger -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Locality *</label>
+                <button type="button" id="btnSelectLocality" class="w-full touch-target rounded-lg px-3 py-2 text-sm font-semibold text-left flex items-center justify-between focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                  <span id="localityDisplayLabel" class="truncate opacity-75">Select Locality...</span>
+                  <span class="ml-2 text-xs opacity-75">▼</span>
+                </button>
+                <input type="hidden" id="inpLocality" value="">
+              </div>
+
+              <!-- Sector -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Sector</label>
+                <input type="text" id="inpSector" value="" placeholder="e.g. Sector 4 / Main Beach Cut" class="w-full touch-target rounded-lg px-3 py-2 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+
+              <!-- Date -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Date *</label>
+                <input type="date" id="inpDate" class="w-full touch-target rounded-lg px-3 py-2 text-sm font-mono focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+
+              <!-- Time & AM/PM -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Time &amp; Meridian *</label>
+                <div class="flex space-x-2">
+                  <input type="time" id="inpTime" value="" class="flex-1 touch-target rounded-lg px-3 py-2 text-sm font-mono focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                  <div class="flex rounded-lg overflow-hidden border" style="border-color: var(--border);">
+                    <button type="button" id="btnTimePM" class="px-3 py-1 font-bold text-xs" style="background-color: var(--btn-active); color: #fff;">PM</button>
+                    <button type="button" id="btnTimeAM" class="px-3 py-1 font-bold text-xs opacity-70" style="background-color: var(--bg-card);">AM</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- No. of Visitors -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">No. of Visitors</label>
+                <div class="flex items-center space-x-2">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpVisitors', -1)">-</button>
+                  <input type="number" id="inpVisitors" value="" placeholder="0" min="0" class="flex-1 touch-target text-center font-bold text-base rounded-lg focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpVisitors', 1)">+</button>
+                </div>
+              </div>
+
+              <!-- Data Entered flag -->
+              <div class="flex items-center pt-5">
+                <label class="flex items-center space-x-2.5 cursor-pointer">
+                  <input type="checkbox" id="chkEntered" class="w-5 h-5 rounded accent-sky-500">
+                  <span class="text-sm font-bold">Entered into Main DB</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recorded Event Card -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center">
+              <span class="mr-2">⚡</span> Recorded Event Type (Select all that apply)
+            </h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <label class="event-pill flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <input type="checkbox" id="chkEventNesting" class="w-5 h-5 rounded">
+                <span class="text-sm font-bold">Nesting</span>
+              </label>
+              <label class="event-pill flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <input type="checkbox" id="chkEventErosion" class="w-5 h-5 rounded">
+                <span class="text-sm font-bold">Erosion</span>
+              </label>
+              <label class="event-pill flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <input type="checkbox" id="chkEventFox" class="w-5 h-5 rounded">
+                <span class="text-sm font-bold">Predation by Fox</span>
+              </label>
+              <label class="event-pill flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <input type="checkbox" id="chkEventDog" class="w-5 h-5 rounded">
+                <span class="text-sm font-bold">Predation by Dog</span>
+              </label>
+              <label class="event-pill flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <input type="checkbox" id="chkEventPig" class="w-5 h-5 rounded">
+                <span class="text-sm font-bold">Predation by Pig</span>
+              </label>
+              <label class="event-pill flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <input type="checkbox" id="chkEventGoanna" class="w-5 h-5 rounded">
+                <span class="text-sm font-bold">Predation by Goanna</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- ----------------------------------------------------------- -->
+        <!-- STEP 2: TURTLE IDENTIFICATION & TAGGING                     -->
+        <!-- ----------------------------------------------------------- -->
+        <div id="stepSection2" class="step-section hidden space-y-4">
+          <!-- Species Selector -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center">
+              <span class="mr-2">🐢</span> Species Identification *
+            </h2>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3" id="speciesSelector">
+              <button type="button" data-species="Loggerhead" class="species-btn touch-target p-3 rounded-xl border text-left font-bold flex flex-col justify-between transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span class="text-base">Loggerhead</span>
+                <span class="text-xs opacity-80 font-normal italic">Caretta caretta</span>
+              </button>
+              <button type="button" data-species="Green" class="species-btn touch-target p-3 rounded-xl border text-left font-bold flex flex-col justify-between transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span class="text-base">Green</span>
+                <span class="text-xs opacity-80 font-normal italic">Chelonia mydas</span>
+              </button>
+              <button type="button" data-species="Flatback" class="species-btn touch-target p-3 rounded-xl border text-left font-bold flex flex-col justify-between transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span class="text-base">Flatback</span>
+                <span class="text-xs opacity-80 font-normal italic">Natator depressus</span>
+              </button>
+              <button type="button" data-species="Hawksbill" class="species-btn touch-target p-3 rounded-xl border text-left font-bold flex flex-col justify-between transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span class="text-base">Hawksbill</span>
+                <span class="text-xs opacity-80 font-normal italic">Eretmochelys imbricata</span>
+              </button>
+              <button type="button" data-species="Ridley" class="species-btn touch-target p-3 rounded-xl border text-left font-bold flex flex-col justify-between transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span class="text-base">Olive Ridley</span>
+                <span class="text-xs opacity-80 font-normal italic">Lepidochelys olivacea</span>
+              </button>
+              <button type="button" data-species="Leatherback" class="species-btn touch-target p-3 rounded-xl border text-left font-bold flex flex-col justify-between transition-all" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span class="text-base">Leatherback</span>
+                <span class="text-xs opacity-80 font-normal italic">Dermochelys coriacea</span>
+              </button>
+            </div>
+            <input type="hidden" id="inpSpecies" value="">
+          </div>
+
+          <!-- Flipper Tags & PIT Tag -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-base font-bold flex items-center">
+                <span class="mr-2">🏷️</span> Titanium Flipper Tags &amp; PIT Tag
+              </h2>
+              <button type="button" id="btnAddTagRow" class="text-xs font-bold px-3 py-1.5 rounded-lg border flex items-center" style="background-color: var(--bg-card); border-color: var(--border);">
+                + Add Another Tag
+              </button>
+            </div>
+
+            <div class="space-y-3" id="tagsContainer">
+              <!-- Tag Row 1: RECAP (Blank initial) -->
+              <div class="p-3 rounded-lg border grid grid-cols-12 gap-2 items-center" style="background-color: var(--bg-card); border-color: var(--border);">
+                <div class="col-span-3 sm:col-span-2">
+                  <select class="tag-status w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    <option value="RECAP">RECAP</option>
+                    <option value="NEW">NEW</option>
+                  </select>
+                </div>
+                <div class="col-span-6 sm:col-span-6">
+                  <input type="text" value="" placeholder="Tag No. (e.g. K12345)" class="tag-number uppercase w-full touch-target rounded px-3 py-1.5 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+                <div class="col-span-3 sm:col-span-4 flex items-center space-x-1">
+                  <select class="tag-pos w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    <option value="L1">Pos: L1 (Left Flipper Prox)</option>
+                    <option value="R1">Pos: R1 (Right Flipper Prox)</option>
+                    <option value="L2">Pos: L2 (Left Flipper Dist)</option>
+                    <option value="R2">Pos: R2 (Right Flipper Dist)</option>
+                    <option value="L3">Pos: L3</option>
+                    <option value="R3">Pos: R3</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Tag Row 2: NEW (Blank initial) -->
+              <div class="p-3 rounded-lg border grid grid-cols-12 gap-2 items-center" style="background-color: var(--bg-card); border-color: var(--border);">
+                <div class="col-span-3 sm:col-span-2">
+                  <select class="tag-status w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    <option value="NEW">NEW</option>
+                    <option value="RECAP">RECAP</option>
+                  </select>
+                </div>
+                <div class="col-span-6 sm:col-span-6">
+                  <input type="text" value="" placeholder="Tag No. (e.g. T67890)" class="tag-number uppercase w-full touch-target rounded px-3 py-1.5 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+                <div class="col-span-3 sm:col-span-4 flex items-center space-x-1">
+                  <select class="tag-pos w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    <option value="R1">Pos: R1 (Right Flipper Prox)</option>
+                    <option value="L1">Pos: L1 (Left Flipper Prox)</option>
+                    <option value="R2">Pos: R2 (Right Flipper Dist)</option>
+                    <option value="L2">Pos: L2 (Left Flipper Dist)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tag Scars, PIT Tag & Tag in Nest Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 pt-4 border-t" style="border-color: var(--border);">
+              <!-- Tag Scar -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Tag Scar Present?</label>
+                <div class="flex rounded-lg overflow-hidden border touch-target" style="border-color: var(--border);">
+                  <button type="button" id="btnScarNo" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-card);">NO</button>
+                  <button type="button" id="btnScarYes" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-card);">YES</button>
+                </div>
+                <input type="hidden" id="inpTagScar" value="">
+              </div>
+
+              <!-- PIT Tag No -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90 flex justify-between">
+                  <span>PIT Tag No.</span>
+                  <button type="button" id="btnSimulateScan" class="text-sky-400 font-normal hover:underline">Scan BLE</button>
+                </label>
+                <input type="text" id="inpPITTag" value="" placeholder="e.g. 982000361284910" class="w-full touch-target rounded-lg px-3 py-2 text-sm font-mono focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+
+              <!-- TAG IN NEST -->
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">TAG IN NEST?</label>
+                <div class="flex rounded-lg overflow-hidden border touch-target" style="border-color: var(--border);">
+                  <button type="button" id="btnTagInNestNo" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-card);">NO</button>
+                  <button type="button" id="btnTagInNestYes" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-card);">YES</button>
+                </div>
+                <input type="hidden" id="inpTagInNest" value="">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ----------------------------------------------------------- -->
+        <!-- STEP 3: MORPHOLOGY, HEALTH & INTERACTIVE ANATOMY            -->
+        <!-- ----------------------------------------------------------- -->
+        <div id="stepSection3" class="step-section hidden space-y-4">
+          <!-- Carapace Measurements -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center justify-between">
+              <span class="flex items-center"><span class="mr-2">📏</span> Carapace Curved Measurements</span>
+              <span class="text-xs font-normal opacity-70">Dual recorder validation</span>
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="p-3 rounded-lg border" style="background-color: var(--bg-card); border-color: var(--border);">
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1">Measurement 1 (Curved Length cm) *</label>
+                <div class="flex space-x-2">
+                  <input type="number" step="0.1" id="inpCarapace1" value="" placeholder="e.g. 96.5" class="w-1/2 touch-target rounded px-3 py-2 text-base font-bold font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                  <input type="text" id="inpCarapaceName1" value="" placeholder="Recorder Name" class="w-1/2 touch-target rounded px-3 py-2 text-xs focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+              </div>
+              <div class="p-3 rounded-lg border" style="background-color: var(--bg-card); border-color: var(--border);">
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1">Measurement 2 (Verification cm)</label>
+                <div class="flex space-x-2">
+                  <input type="number" step="0.1" id="inpCarapace2" value="" placeholder="e.g. 96.7" class="w-1/2 touch-target rounded px-3 py-2 text-base font-bold font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                  <input type="text" id="inpCarapaceName2" value="" placeholder="Recorder Name" class="w-1/2 touch-target rounded px-3 py-2 text-xs focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+              </div>
+            </div>
+            <div id="carapaceWarning" class="hidden mt-2 p-2 rounded text-xs font-semibold" style="background-color: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #fca5a5;">
+              ⚠️ Note: Adult Loggerheads typically range 80–110 cm curved carapace length. Please verify measurement tape.
+            </div>
+          </div>
+
+          <!-- Interactive Anatomical Diagram & Health Check -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h2 class="text-base font-bold flex items-center">
+                  <span class="mr-2">🩺</span> Turtle Health, Damage &amp; Commensals
+                </h2>
+                <p class="text-xs opacity-75">Tap flippers or carapace on the diagram to toggle damage/epibiota tags.</p>
+              </div>
+              <div class="flex items-center space-x-2 text-xs font-medium">
+                <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-red-500 mr-1"></span> Damage</span>
+                <span class="inline-flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-500 mr-1"></span> Commensals</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              
+              <!-- SVG Turtle Anatomical Map -->
+              <div class="lg:col-span-5 flex flex-col items-center justify-center p-2 rounded-xl border relative" style="background-color: var(--bg-card); border-color: var(--border);">
+                
+                <svg id="turtleSvg" viewBox="0 0 400 480" class="w-64 max-w-full h-auto select-none">
+                  <!-- Head -->
+                  <path id="part_Head" class="turtle-part" d="M180 80 C180 35, 220 35, 220 80 C220 100, 180 100, 180 80 Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+                  
+                  <!-- Left Front Flipper (LFF) -->
+                  <path id="part_LFF" class="turtle-part" d="M170 120 C100 80, 20 120, 30 190 C45 220, 100 180, 155 170 Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+                  
+                  <!-- Right Front Flipper (RFF) -->
+                  <path id="part_RFF" class="turtle-part" d="M230 120 C300 80, 380 120, 370 190 C355 220, 300 180, 245 170 Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+                  
+                  <!-- Left Hind Flipper (LHF) -->
+                  <path id="part_LHF" class="turtle-part" d="M160 320 C100 350, 70 410, 110 440 C140 450, 170 390, 175 350 Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+                  
+                  <!-- Right Hind Flipper (RHF) -->
+                  <path id="part_RHF" class="turtle-part" d="M240 320 C300 350, 330 410, 290 440 C260 450, 230 390, 225 350 Z" fill="#334155" stroke="#94a3b8" stroke-width="2"/>
+                  
+                  <!-- Carapace (Center Body) -->
+                  <path id="part_Carapace" class="turtle-part" d="M200 110 C140 110, 130 180, 130 250 C130 330, 170 370, 200 370 C230 370, 270 330, 270 250 C270 180, 260 110, 200 110 Z" fill="#1e293b" stroke="#94a3b8" stroke-width="2.5"/>
+
+                  <!-- Tail -->
+                  <path d="M195 370 L200 395 L205 370 Z" fill="#334155" stroke="#94a3b8" stroke-width="1.5"/>
+
+                  <!-- Labels on Diagram -->
+                  <text x="200" y="70" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff" pointer-events="none">HEAD</text>
+                  <text x="90" y="150" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff" pointer-events="none">LFF</text>
+                  <text x="310" y="150" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff" pointer-events="none">RFF</text>
+                  <text x="200" y="245" text-anchor="middle" font-size="12" font-weight="bold" fill="#ffffff" pointer-events="none">CARAPACE</text>
+                  <text x="120" y="380" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff" pointer-events="none">LHF</text>
+                  <text x="280" y="380" text-anchor="middle" font-size="11" font-weight="bold" fill="#ffffff" pointer-events="none">RHF</text>
+                </svg>
+
+                <div class="mt-2 text-center text-xs opacity-75">Click a section to tag Damage</div>
+              </div>
+
+              <!-- Damage & Commensals Attribute Checklists -->
+              <div class="lg:col-span-7 space-y-4">
+                <!-- Damage Checkboxes -->
+                <div>
+                  <h3 class="text-xs font-bold uppercase tracking-wider mb-2 opacity-90">DAMAGE Locations</h3>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgCarapace" class="w-4 h-4 rounded dmg-sync" data-part="part_Carapace">
+                      <span>Carapace</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgLFF" class="w-4 h-4 rounded dmg-sync" data-part="part_LFF">
+                      <span>LFF (Left Front)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgRFF" class="w-4 h-4 rounded dmg-sync" data-part="part_RFF">
+                      <span>RFF (Right Front)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgLHF" class="w-4 h-4 rounded dmg-sync" data-part="part_LHF">
+                      <span>LHF (Left Hind)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgRHF" class="w-4 h-4 rounded dmg-sync" data-part="part_RHF">
+                      <span>RHF (Right Hind)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgFibro" class="w-4 h-4 rounded">
+                      <span>Fibropapillomas</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkDmgLumps" class="w-4 h-4 rounded">
+                      <span>Lumps</span>
+                    </label>
+                    <div class="col-span-2">
+                      <input type="text" id="inpDmgOther" value="" placeholder="Damage: Other (specify)" class="w-full touch-target rounded px-2.5 py-1.5 text-xs focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Commensals Checkboxes -->
+                <div class="pt-3 border-t" style="border-color: var(--border);">
+                  <h3 class="text-xs font-bold uppercase tracking-wider mb-2 opacity-90">COMMENSALS (Epibiota)</h3>
+                  <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkComChelonibia" class="w-4 h-4 rounded">
+                      <span>Chelonibia barnacles</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkComBurrowing" class="w-4 h-4 rounded">
+                      <span>Burrowing barnacles</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkComAlgae" class="w-4 h-4 rounded">
+                      <span>Algae (thick)</span>
+                    </label>
+                    <label class="flex items-center space-x-2 p-2 rounded border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                      <input type="checkbox" id="chkComMud" class="w-4 h-4 rounded">
+                      <span>Mud (thick)</span>
+                    </label>
+                    <div class="col-span-2">
+                      <input type="text" id="inpComOther" value="" placeholder="Commensals: Other (specify)" class="w-full touch-target rounded px-2.5 py-1.5 text-xs focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ----------------------------------------------------------- -->
+        <!-- STEP 4: NESTING ACTIVITY, HABITAT & DISTURBANCE             -->
+        <!-- ----------------------------------------------------------- -->
+        <div id="stepSection4" class="step-section hidden space-y-4">
+          <!-- Nesting Activity Card -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center">
+              <span class="mr-2">🥚</span> Nesting Activity &amp; Disturbance
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <button type="button" data-activity="laid" class="activity-btn touch-target p-3 rounded-xl border text-center font-bold transition-all opacity-80" style="background-color: var(--bg-card); border-color: var(--border);">
+                laid (Clutch confirmed)
+              </button>
+              <button type="button" data-activity="no lay" class="activity-btn touch-target p-3 rounded-xl border text-center font-bold transition-all opacity-80" style="background-color: var(--bg-card); border-color: var(--border);">
+                no lay (False crawl / aborted)
+              </button>
+              <button type="button" data-activity="laid/dis" class="activity-btn touch-target p-3 rounded-xl border text-center font-bold transition-all opacity-80" style="background-color: var(--bg-card); border-color: var(--border);">
+                laid/dis (Laid &amp; Disturbed)
+              </button>
+            </div>
+            <input type="hidden" id="inpNestingActivity" value="">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Cause of Disturbance (if any)</label>
+                <input type="text" id="inpDisturbance" value="" placeholder="e.g. Artificial lights, dog tracks, foot traffic" class="w-full touch-target rounded-lg px-3 py-2 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">No. of Egg Chambers Attempted</label>
+                <div class="flex items-center space-x-2">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpEggChambers', -1)">-</button>
+                  <input type="number" id="inpEggChambers" value="" placeholder="1" min="0" class="flex-1 touch-target text-center font-bold text-base rounded-lg focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpEggChambers', 1)">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nest Location & Nesting Habitat -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              
+              <!-- Nest Location -->
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider mb-2 opacity-90">NEST LOCATION (Beach Zonation)</h3>
+                <div class="space-y-2">
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestLocation" value="dune 2nd" class="w-4 h-4">
+                    <span>dune 2nd (Secondary foredune)</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestLocation" value="dune 1st" class="w-4 h-4">
+                    <span>dune 1st (Primary foredune)</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestLocation" value="grass slope" class="w-4 h-4">
+                    <span>grass slope</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestLocation" value="below slope" class="w-4 h-4">
+                    <span>below slope</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestLocation" value="below HW" class="w-4 h-4">
+                    <span>below HW (Below High Water - Doomed nest)</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Nesting Habitat -->
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider mb-2 opacity-90">NESTING HABITAT</h3>
+                <div class="space-y-2">
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestHabitat" value="bare sand" class="w-4 h-4">
+                    <span>bare sand</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestHabitat" value="in grass" class="w-4 h-4">
+                    <span>in grass (Spinifex / vegetation)</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestHabitat" value="under tree" class="w-4 h-4">
+                    <span>under tree (Casuarina / Sheoak)</span>
+                  </label>
+                  <label class="flex items-center space-x-2.5 p-2.5 rounded-lg border cursor-pointer text-xs font-semibold" style="background-color: var(--bg-card); border-color: var(--border);">
+                    <input type="radio" name="nestHabitat" value="under shrub" class="w-4 h-4">
+                    <span>under shrub</span>
+                  </label>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Clutch Destruction (if applicable) -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center text-amber-400">
+              <span class="mr-2">⚠️</span> Clutch Destruction Assessment (Optional / Incident only)
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">No. Eggs Destroyed</label>
+                <input type="number" id="inpClutchDestEggs" value="" placeholder="0" class="w-full touch-target rounded-lg px-3 py-2 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Associated Tag No.</label>
+                <input type="text" id="inpClutchDestTag" value="" placeholder="Tag No." class="w-full touch-target rounded-lg px-3 py-2 text-sm uppercase focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Date Laid</label>
+                <input type="date" id="inpClutchDestDate" value="" class="w-full touch-target rounded-lg px-3 py-2 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ----------------------------------------------------------- -->
+        <!-- STEP 5: NEST MAPPING, DEPTH & CLUTCH DATA                   -->
+        <!-- ----------------------------------------------------------- -->
+        <div id="stepSection5" class="step-section hidden space-y-4">
+          <!-- Nest Mapping Paradigm -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <div class="flex items-center justify-between mb-3">
+              <h2 class="text-base font-bold flex items-center">
+                <span class="mr-2">🗺️</span> Nest Mapping &amp; Spatial Coordinates
+              </h2>
+              <!-- Mapping Mode Tabs -->
+              <div class="flex rounded-lg overflow-hidden border text-xs font-bold" style="border-color: var(--border);">
+                <button type="button" id="btnMapModeBeach" class="px-3 py-1.5" style="background-color: var(--btn-active); color: #fff;">Open Beach</button>
+                <button type="button" id="btnMapModeCages" class="px-3 py-1.5 opacity-70" style="background-color: var(--bg-card);">Cages &amp; Hatcheries</button>
+              </div>
+            </div>
+
+            <!-- Open Beach Triangulation & GPS -->
+            <div id="panelMapBeach" class="space-y-4">
+              <div class="p-3 rounded-lg border" style="background-color: var(--bg-card); border-color: var(--border);">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <span class="text-xs font-bold uppercase tracking-wider">High-Precision GPS Location *</span>
+                  <button type="button" id="btnFetchGPS" class="px-3 py-1 rounded text-xs font-bold flex items-center space-x-1" style="background-color: var(--btn-active); color: #fff;">
+                    <span>📡 Capture Beach GPS</span>
+                  </button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs opacity-75 mb-1">Latitude (WGS84)</label>
+                    <input type="text" id="inpLat" value="" placeholder="e.g. -24.87241" class="w-full touch-target rounded px-3 py-2 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                  </div>
+                  <div>
+                    <label class="block text-xs opacity-75 mb-1">Longitude (WGS84)</label>
+                    <input type="text" id="inpLong" value="" placeholder="e.g. 152.48312" class="w-full touch-target rounded px-3 py-2 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                  </div>
+                </div>
+                <div id="gpsStatus" class="text-xs mt-1 opacity-70 italic">Click Capture Beach GPS to fetch coordinates</div>
+              </div>
+
+              <!-- Open Beach Post Triangulation -->
+              <div class="p-3 rounded-lg border space-y-3" style="background-color: var(--bg-card); border-color: var(--border);">
+                <div class="text-xs font-bold uppercase tracking-wider">Marker Post Triangulation</div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs opacity-75 mb-1">Post No. 1 &amp; Distance</label>
+                    <div class="flex space-x-1">
+                      <input type="text" id="inpPost1" value="" placeholder="Post #" class="w-1/2 touch-target rounded px-2 py-1 text-xs focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                      <input type="number" step="0.1" id="inpPost1Dist" value="" placeholder="meters" class="w-1/2 touch-target rounded px-2 py-1 text-xs font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs opacity-75 mb-1">Post No. 2 &amp; Distance</label>
+                    <div class="flex space-x-1">
+                      <input type="text" id="inpPost2" value="" placeholder="Post #" class="w-1/2 touch-target rounded px-2 py-1 text-xs focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                      <input type="number" step="0.1" id="inpPost2Dist" value="" placeholder="meters" class="w-1/2 touch-target rounded px-2 py-1 text-xs font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs opacity-75 mb-1">Orientation</label>
+                    <div class="flex rounded overflow-hidden border touch-target" style="border-color: var(--border);">
+                      <button type="button" id="btnLandward" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-secondary);">Landward</button>
+                      <button type="button" id="btnSeaward" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-secondary);">Seaward</button>
+                    </div>
+                    <input type="hidden" id="inpHatcheryOrientation" value="">
+                  </div>
+                </div>
+                <div class="text-xs opacity-75 italic">*NOTE: This is the final position of clutch for incubation.</div>
+              </div>
+            </div>
+
+            <!-- Cages & Hatcheries Panel -->
+            <div id="panelMapCages" class="hidden space-y-4">
+              <div class="p-3 rounded-lg border space-y-3" style="background-color: var(--bg-card); border-color: var(--border);">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold uppercase mb-1">Plot Code *</label>
+                    <select id="inpPlotCode" class="w-full touch-target rounded px-3 py-2 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                      <option value="">-- Select Plot Code --</option>
+                      <option value="RH1">RH1 = Northern Hatchery</option>
+                      <option value="RH2">RH2 = Southern Hatchery</option>
+                      <option value="RC">RC = Predator Cage (e.g. RC1)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold uppercase mb-1">Plot Identification</label>
+                    <input type="text" id="inpPlot" value="" placeholder="e.g. RC1" class="w-full touch-target rounded px-3 py-2 text-xs focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold uppercase mb-1">Row / Knot (R_ K_)</label>
+                    <div class="flex space-x-2">
+                      <input type="text" id="inpRow" value="" placeholder="Row (R)" class="w-1/2 touch-target rounded px-3 py-2 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                      <input type="text" id="inpKnot" value="" placeholder="Knot (K)" class="w-1/2 touch-target rounded px-3 py-2 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                    </div>
+                  </div>
+                </div>
+                <div class="p-2 rounded text-xs font-semibold" style="background-color: rgba(14, 165, 233, 0.15); border: 1px solid var(--accent);">
+                  *NOTE: Clutches must be positioned one handspan seaward of knot.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Natural Nest Depth & Relocation -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center">
+              <span class="mr-2">📏</span> Nest Chamber Depth &amp; Clutch Relocation
+            </h2>
+
+            <!-- Natural Nest Depth -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Natural Nest Depth: TOP (cm) *</label>
+                <div class="flex items-center space-x-2">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpDepthTop', -1)">-</button>
+                  <input type="number" id="inpDepthTop" value="" placeholder="e.g. 48" min="0" class="flex-1 touch-target text-center font-bold text-base rounded-lg focus:outline-none font-mono" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpDepthTop', 1)">+</button>
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Natural Nest Depth: BOTTOM (cm) *</label>
+                <div class="flex items-center space-x-2">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpDepthBottom', -1)">-</button>
+                  <input type="number" id="inpDepthBottom" value="" placeholder="e.g. 68" min="0" class="flex-1 touch-target text-center font-bold text-base rounded-lg focus:outline-none font-mono" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+                  <button type="button" class="w-12 touch-target rounded-lg font-bold text-lg" style="background-color: var(--bg-card); border: 1px solid var(--border);" onclick="adjustNumber('inpDepthBottom', 1)">+</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Clutch Relocation Switch -->
+            <div class="p-3 rounded-lg border mb-4" style="background-color: var(--bg-card); border-color: var(--border);">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-bold text-sm">Clutch Relocation Performed?</div>
+                  <div class="text-xs opacity-75">Required if eggs below high-water mark or heavy erosion zone</div>
+                </div>
+                <div class="flex rounded-lg overflow-hidden border touch-target w-32" style="border-color: var(--border);">
+                  <button type="button" id="btnReloNo" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-secondary);">NO</button>
+                  <button type="button" id="btnReloYes" class="flex-1 font-bold text-xs opacity-75" style="background-color: var(--bg-secondary);">YES</button>
+                </div>
+              </div>
+              <input type="hidden" id="inpClutchRelo" value="">
+
+              <!-- Relocation Child Fields -->
+              <div id="panelReloDetails" class="hidden mt-3 pt-3 border-t grid grid-cols-1 sm:grid-cols-4 gap-3" style="border-color: var(--border);">
+                <div>
+                  <label class="block text-xs font-bold uppercase mb-1">Relo Nest Dug By</label>
+                  <input type="text" id="inpReloDugBy" value="" placeholder="Full Name" class="w-full touch-target rounded px-2.5 py-1.5 text-xs focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase mb-1">Total Clutch Count</label>
+                  <input type="number" id="inpClutchCount" value="" placeholder="e.g. 124" class="w-full touch-target rounded px-2.5 py-1.5 text-sm font-bold font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase mb-1">Yolkless Eggs</label>
+                  <input type="number" id="inpYolkless" value="" placeholder="0" min="0" class="w-full touch-target rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold uppercase mb-1">Multi-yolk Eggs</label>
+                  <input type="number" id="inpMultiYolk" value="" placeholder="0" min="0" class="w-full touch-target rounded px-2.5 py-1.5 text-sm font-mono focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ----------------------------------------------------------- -->
+        <!-- STEP 6: PHOTOS, FIELD NOTES & RECORDER SIGN-OFF             -->
+        <!-- ----------------------------------------------------------- -->
+        <div id="stepSection6" class="step-section hidden space-y-4">
+          <!-- Mandatory Photo Pairing & Consent -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-2 flex items-center">
+              <span class="mr-2">📷</span> Photo Documentation &amp; Mandatory Tag Pairing
+            </h2>
+            <div class="p-3 rounded-lg border mb-3 text-xs" style="background-color: var(--bg-card); border-color: var(--border);">
+              <p class="font-bold mb-1 text-sky-400">QTCP Protocol Warning:</p>
+              <p class="opacity-80">Any photos need to be accompanied with a single clear flipper tag photo to allow biometric cataloging.</p>
+              <p class="opacity-70 mt-1 italic">* Providing photos to QTCP, you consent to the full use of all images by the Department for training and reporting purposes.</p>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+              <label class="px-4 py-2.5 rounded-lg border font-bold text-xs cursor-pointer flex items-center space-x-2" style="background-color: var(--btn-active); color: #fff; border-color: var(--accent);">
+                <span>📸 Attach Tag Photo</span>
+                <input type="file" id="inpPhotoFile" accept="image/*" class="hidden">
+              </label>
+              <span id="photoStatusText" class="text-xs opacity-75">No photo attached yet</span>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <div class="flex items-center justify-between mb-2">
+              <h2 class="text-base font-bold flex items-center">
+                <span class="mr-2">📝</span> Field Notes &amp; Observations
+              </h2>
+              <button type="button" id="btnVoiceNotes" class="text-xs font-semibold px-2 py-1 rounded border flex items-center space-x-1" style="background-color: var(--bg-card); border-color: var(--border);">
+                <span>🎙️ Voice Dictation</span>
+              </button>
+            </div>
+            <textarea id="inpNotes" rows="4" placeholder="Record unusual behavior, tides, lighting issues, weather conditions, beach visitors..." class="w-full rounded-lg p-3 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);"></textarea>
+          </div>
+
+          <!-- Data Recorders Sign-Off -->
+          <div class="rounded-xl p-4 sm:p-6 shadow-lg" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+            <h2 class="text-base font-bold mb-3 flex items-center">
+              <span class="mr-2">✍️</span> Data Recorders (Full Names)
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Turtle / Clutch Processed By (Handler) *</label>
+                <input type="text" id="inpProcessedBy" value="" placeholder="e.g. Dr. Col Limpus" class="w-full touch-target rounded-lg px-3 py-2 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+              <div>
+                <label class="block text-xs font-bold uppercase tracking-wider mb-1 opacity-90">Datasheet Completed By (Scribe) *</label>
+                <input type="text" id="inpCompletedBy" value="" placeholder="e.g. Ranger Sarah Jenkins" class="w-full touch-target rounded-lg px-3 py-2 text-sm focus:outline-none" style="background-color: var(--bg-card); border: 1px solid var(--border); color: var(--text-main);">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STICKY STEPPER CONTROLS (BOTTOM BAR) -->
+        <div class="no-print fixed bottom-0 left-0 right-0 p-3 backdrop-blur-lg border-t z-40" style="background-color: var(--bg-secondary); border-color: var(--border);">
+          <div class="max-w-5xl mx-auto flex items-center justify-between gap-3">
+            <button type="button" id="btnPrevStep" class="px-5 py-2.5 rounded-xl font-bold text-sm border opacity-80 hover:opacity-100 flex items-center" style="background-color: var(--bg-card); border-color: var(--border);">
+              ← Back
+            </button>
+            <button type="button" id="btnQuickSaveRecord" class="hidden sm:flex px-4 py-2 rounded-xl text-xs font-bold border items-center space-x-1" style="background-color: var(--bg-card); border-color: var(--border);">
+              <span>💾 Save to CSV Log</span>
+            </button>
+            <button type="button" id="btnNextStep" class="px-6 py-2.5 rounded-xl font-bold text-sm shadow-lg flex items-center" style="background-color: var(--btn-active); color: #ffffff;">
+              Next Phase →
+            </button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- VIEW B: EXACT PAPER DATASHEET REPLICA (AUDIT & PRINT VIEW)    -->
+    <!-- ============================================================== -->
+    <div id="viewPaper" class="hidden">
+      <!-- Top banner for Audit View -->
+      <div class="no-print mb-4 p-3 rounded-lg flex flex-wrap items-center justify-between gap-2" style="background-color: var(--bg-secondary); border: 1px solid var(--border);">
+        <div class="text-xs">
+          <span class="font-bold">Official Paper Mirror (MR26_Nesting_WC):</span> Dynamic 1:1 replica showing ONLY the information you entered.
+        </div>
+        <div class="flex items-center space-x-2">
+          <button id="btnPrintFromPaper" class="px-3 py-1.5 rounded font-bold text-xs bg-sky-600 text-white hover:bg-sky-500">
+            🖨️ Print Datasheet
+          </button>
+          <button id="btnQuickExportCsvFromPaper" class="px-3 py-1.5 rounded font-bold text-xs border" style="background-color: var(--bg-card); border-color: var(--border);">
+            Save to Shift CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- Physical A4 Page Layout Container (Pristine Unfilled by Default) -->
+      <div id="paperSheetContainer" class="paper-sheet p-6 max-w-4xl mx-auto border-2 border-black rounded-sm text-black">
+        
+        <!-- HEADER -->
+        <div class="text-center pb-2 relative">
+          <h2 class="text-lg font-black tracking-tight uppercase">QUEENSLAND TURTLE CONSERVATION PROJECT</h2>
+          <h3 class="text-sm font-bold tracking-normal">Nesting Turtles &amp; Predation of Clutches</h3>
+          <div class="absolute right-0 top-0 flex items-center space-x-1 text-xs">
+            <span>entered</span>
+            <div class="w-4 h-4 border border-black inline-block text-center font-bold leading-none" id="paperEntered"></div>
+          </div>
+        </div>
+
+        <!-- TOP METADATA GRID -->
+        <table class="w-full border-collapse border border-black text-xs font-sans">
+          <tbody>
+            <tr>
+              <td class="border border-black p-1 w-2/5 font-bold">
+                Tag No.
+              </td>
+              <td class="border border-black p-1 w-1/12 font-bold text-center">
+                Pos
+              </td>
+              <td class="border border-black p-1 w-1/4">
+                <span class="font-bold">Locality:</span> <span id="paperLocality"></span>
+              </td>
+              <td class="border border-black p-1">
+                <span class="font-bold">No. of visitors:</span> <span id="paperVisitors"></span>
+              </td>
+            </tr>
+            <tr>
+              <td rowspan="3" class="border border-black p-0 align-top">
+                <div class="flex h-full">
+                  <div class="w-8 border-r border-black font-bold flex flex-col items-center justify-around py-1 text-[10px] leading-tight">
+                    <span>R</span><span>E</span><span>C</span><span>A</span><span>P</span>
+                  </div>
+                  <div class="flex-1 p-1 font-mono font-bold" id="paperRecapTags"></div>
+                </div>
+              </td>
+              <td rowspan="3" class="border border-black p-1 text-center font-mono font-bold align-top" id="paperRecapPos"></td>
+              <td class="border border-black p-1">
+                <span class="font-bold">Date:</span> <span id="paperDate"></span>
+              </td>
+              <td class="border border-black p-1">
+                <span class="font-bold">Sector:</span> <span id="paperSector"></span>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" class="border border-black p-1">
+                <span class="font-bold">Time:</span> <span id="paperTime"></span>
+              </td>
+            </tr>
+            <tr>
+              <td class="border border-black p-1 font-bold">RECORDED EVENT</td>
+              <td class="border border-black p-1 font-bold">NESTING ACTIVITY</td>
+            </tr>
+            <tr>
+              <td rowspan="2" class="border border-black p-0 align-top">
+                <div class="flex h-full">
+                  <div class="w-8 border-r border-black font-bold flex flex-col items-center justify-around py-1 text-[10px] leading-tight">
+                    <span>N</span><span>E</span><span>W</span>
+                  </div>
+                  <div class="flex-1 p-1 font-mono font-bold" id="paperNewTags"></div>
+                </div>
+              </td>
+              <td rowspan="2" class="border border-black p-1 text-center font-mono font-bold align-top" id="paperNewPos"></td>
+              <td rowspan="4" class="border border-black p-1 align-top space-y-0.5 text-[11px]">
+                <div class="flex justify-between"><span>Nesting.........</span><span id="paperEvNesting">o</span></div>
+                <div class="flex justify-between"><span>Erosion….....</span><span id="paperEvErosion">o</span></div>
+                <div class="flex justify-between"><span>Predation by fox.........</span><span id="paperEvFox">o</span></div>
+                <div class="flex justify-between"><span>Predation by dog .......</span><span id="paperEvDog">o</span></div>
+                <div class="flex justify-between"><span>Predation by pig.........</span><span id="paperEvPig">o</span></div>
+                <div class="flex justify-between"><span>Predation by goanna...</span><span id="paperEvGoanna">o</span></div>
+              </td>
+              <td rowspan="4" class="border border-black p-1 align-top space-y-0.5 text-[11px]">
+                <div class="border-b border-black pb-0.5 mb-1 text-[10px]" id="paperNestingActHeader">___________________</div>
+                <div class="flex justify-between"><span>laid.......</span><span id="paperActLaid">o</span></div>
+                <div class="flex justify-between"><span>no lay.....</span><span id="paperActNoLay">o</span></div>
+                <div class="flex justify-between"><span>laid/dis.....</span><span id="paperActLaidDis">o</span></div>
+                <div class="pt-1 font-bold text-[10px]">CAUSE OF DISTURBANCE:</div>
+                <div class="italic text-[10px]" id="paperDisturbance"></div>
+                <div class="pt-1">No. egg chambers: <span class="font-bold" id="paperEggChambers"></span></div>
+              </td>
+            </tr>
+            <tr>
+              <!-- continuation of NEW tags -->
+            </tr>
+            <tr>
+              <td class="border border-black p-1">
+                <span class="font-bold">Tag Scar:</span> <span id="paperTagScar"></span>
+              </td>
+              <td class="border border-black p-1"></td>
+            </tr>
+            <tr>
+              <td colspan="2" class="border border-black p-1">
+                <span class="font-bold">PIT tag No.</span> <span class="font-mono font-bold ml-2" id="paperPIT"></span>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" class="border border-black p-1">
+                <span class="font-bold">TAG IN NEST:</span> <span id="paperTagInNest"></span>
+              </td>
+              <td colspan="2" class="border border-black p-1 font-bold">
+                SPECIES: <span class="font-normal font-sans ml-2 text-sm" id="paperSpecies"></span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- MID SECTION: DAMAGE, COMMENSALS, CARAPACE, DIAGRAM -->
+        <div class="grid grid-cols-12 border-l border-r border-b border-black text-xs">
+          
+          <!-- Damage Column -->
+          <div class="col-span-3 border-r border-black p-1.5 space-y-0.5 text-[11px]">
+            <div class="font-bold underline mb-1">DAMAGE</div>
+            <div class="flex justify-between"><span>Carapace.....</span><span id="pDmgCarapace">o</span></div>
+            <div class="flex justify-between"><span>LFF..........</span><span id="pDmgLFF">o</span></div>
+            <div class="flex justify-between"><span>RFF..........</span><span id="pDmgRFF">o</span></div>
+            <div class="flex justify-between"><span>LHF..........</span><span id="pDmgLHF">o</span></div>
+            <div class="flex justify-between"><span>RHF..........</span><span id="pDmgRHF">o</span></div>
+            <div class="flex justify-between"><span>Fibropapillomas..</span><span id="pDmgFibro">o</span></div>
+            <div class="flex justify-between"><span>Lumps..........</span><span id="pDmgLumps">o</span></div>
+            <div class="pt-1">Other (specify):</div>
+            <div class="italic text-[10px]" id="pDmgOther"></div>
+          </div>
+
+          <!-- Commensals Column -->
+          <div class="col-span-3 border-r border-black p-1.5 space-y-0.5 text-[11px]">
+            <div class="font-bold underline mb-1">COMMENSALS</div>
+            <div class="flex justify-between"><span>Chelonibia........</span><span id="pComChel">o</span></div>
+            <div class="flex justify-between leading-tight"><span>Burrowing barnacles..</span><span id="pComBurr">o</span></div>
+            <div class="flex justify-between"><span>Algae (thick).....</span><span id="pComAlgae">o</span></div>
+            <div class="flex justify-between"><span>Mud (thick)........</span><span id="pComMud">o</span></div>
+            <div class="pt-2">Other (specify):</div>
+            <div class="italic text-[10px]" id="pComOther"></div>
+          </div>
+
+          <!-- Carapace & Nest Ecology Column -->
+          <div class="col-span-6 p-1.5 flex flex-col justify-between">
+            <div>
+              <div class="font-bold underline mb-1">CARAPACE</div>
+              <div class="space-y-1 text-[11px]">
+                <div>Length <span class="font-mono font-bold border-b border-black px-2" id="pCarapace1"></span> cm (Name: <span id="pCaraName1"></span>)</div>
+                <div>Length <span class="font-mono font-bold border-b border-black px-2" id="pCarapace2"></span> cm (Name: <span id="pCaraName2"></span>)</div>
+              </div>
+            </div>
+
+            <!-- Nest Location & Habitat in Paper -->
+            <div class="grid grid-cols-2 gap-2 pt-2 border-t border-black text-[10px]">
+              <div>
+                <div class="font-bold underline">NEST LOCATION</div>
+                <div>dune 2nd......... <span id="pLocDune2">o</span></div>
+                <div>dune 1st.......... <span id="pLocDune1">o</span></div>
+                <div>grass slope..... <span id="pLocGrass">o</span></div>
+                <div>below slope..... <span id="pLocBelow">o</span></div>
+                <div>below HW........ <span id="pLocHW">o</span></div>
+              </div>
+              <div>
+                <div class="font-bold underline">NESTING HABITAT</div>
+                <div>bare sand........ <span id="pHabSand">o</span></div>
+                <div>in grass............ <span id="pHabGrass">o</span></div>
+                <div>under tree........ <span id="pHabTree">o</span></div>
+                <div>under shrub..... <span id="pHabShrub">o</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- BOTTOM SECTION: MAPS, CLUTCH DATA, RECORDERS -->
+        <table class="w-full border-collapse border border-black text-xs font-sans mt-[-1px]">
+          <tbody>
+            <tr>
+              <td class="border border-black p-1.5 w-1/2 align-top text-[11px]">
+                <div class="font-bold">NEST MAP: cages &amp; hatcheries</div>
+                <div>*Plot: <span class="border-b border-black px-2 font-mono" id="pPlot"></span></div>
+                <div>Row/Knot: R<span class="border-b border-black px-1 font-mono" id="pRow"></span> K<span class="border-b border-black px-1 font-mono" id="pKnot"></span></div>
+                <div class="text-[9px] opacity-80 pt-1">*NOTE: clutches must be positioned one handspan seaward of knot.</div>
+              </td>
+              <td class="border border-black p-1.5 w-1/2 align-top text-[11px]">
+                <div class="font-bold">NEST MAP: open beach</div>
+                <div>Post No. <span class="font-mono font-bold" id="pPost1"></span> : <span class="font-mono" id="pPost1D"></span> m</div>
+                <div>Post No. <span class="font-mono font-bold" id="pPost2"></span> : <span class="font-mono" id="pPost2D"></span> m</div>
+                <div>Orientation: <span class="font-bold" id="pOrient"></span></div>
+                <div>Lat: <span class="font-mono font-bold" id="pLat"></span> Long: <span class="font-mono font-bold" id="pLong"></span></div>
+              </td>
+            </tr>
+            <tr>
+              <td class="border border-black p-1.5 align-top text-[11px]">
+                <div class="font-bold">CLUTCH DATA</div>
+                <div>Clutch relocation: <span class="font-bold" id="pRelo"></span></div>
+                <div>Relo nest dug by: <span id="pReloDug"></span></div>
+                <div>Clutch count: <span class="font-bold font-mono" id="pClutchCount"></span></div>
+                <div>Yolkless eggs: <span class="font-mono" id="pYolkless"></span> | Multi-yolk eggs: <span class="font-mono" id="pMulti"></span></div>
+              </td>
+              <td class="border border-black p-1.5 align-top text-[11px]">
+                <div class="font-bold">NATURAL NEST DEPTH</div>
+                <div>Top: <span class="font-bold font-mono" id="pDepthTop"></span> cm</div>
+                <div>Bottom: <span class="font-bold font-mono" id="pDepthBottom"></span> cm</div>
+                <div class="pt-2 font-bold">DATA RECORDERS (full name)</div>
+                <div>turtle/clutch processed by: <span class="font-bold" id="pProcessed"></span></div>
+                <div>datasheet completed by: <span class="font-bold" id="pCompleted"></span></div>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" class="border border-black p-1.5 text-[11px]">
+                <div class="font-bold">NOTES:</div>
+                <div class="italic text-[10px]" id="pNotes"></div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script>
+    // State Management
+    let currentStep = 1;
+    const totalSteps = 6;
+    
+    // Shift CSV Database (Initially empty for pristine fresh testing)
+    let shiftRecords = [];
+    let activeRecordId = null;
+
+    // Form Data - Pristine Unpopulated Blank State
+    let formData = {
+      locality: "",
+      sector: "",
+      date: new Date().toISOString().split('T')[0],
+      time: "",
+      timeMeridian: "PM",
+      visitors: "",
+      entered: false,
+      events: { nesting: false, erosion: false, fox: false, dog: false, pig: false, goanna: false },
+      species: "",
+      tags: [
+        { status: "RECAP", number: "", pos: "L1" },
+        { status: "NEW", number: "", pos: "R1" }
+      ],
+      tagScar: "",
+      pitTag: "",
+      tagInNest: "",
+      carapace1: "",
+      carapaceName1: "",
+      carapace2: "",
+      carapaceName2: "",
+      damage: { carapace: false, lff: false, rff: false, lhf: false, rhf: false, fibro: false, lumps: false, other: "" },
+      commensals: { chelonibia: false, burrowing: false, algae: false, mud: false, other: "" },
+      nestingActivity: "",
+      disturbance: "",
+      eggChambers: "",
+      nestLocation: "",
+      nestHabitat: "",
+      clutchDest: { eggs: "", tag: "", date: "" },
+      mapMode: "beach",
+      lat: "",
+      long: "",
+      post1: "",
+      post1Dist: "",
+      post2: "",
+      post2Dist: "",
+      orientation: "",
+      plotCode: "",
+      plot: "",
+      row: "",
+      knot: "",
+      nestDepthTop: "",
+      nestDepthBottom: "",
+      clutchRelocation: "",
+      reloDugBy: "",
+      clutchCount: "",
+      yolkless: "",
+      multiYolk: "",
+      notes: "",
+      processedBy: "",
+      completedBy: ""
+    };
+
+    // Show In-App Toast
+    function showToast(msg, icon = "ℹ️") {
+      const toast = document.getElementById('appToast');
+      const msgEl = document.getElementById('toastMessage');
+      const iconEl = document.getElementById('toastIcon');
+      if (toast && msgEl && iconEl) {
+        msgEl.textContent = msg;
+        iconEl.textContent = icon;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 3200);
+      }
+    }
+
+    // Helper: Adjust number inputs
+    function adjustNumber(id, delta) {
+      const el = document.getElementById(id);
+      if (el) {
+        let val = parseInt(el.value, 10);
+        if (isNaN(val)) val = 0;
+        val = Math.max(0, val + delta);
+        el.value = val;
+        syncStateFromUI();
+      }
+    }
+
+    // Helper: Get Current Device Time & Meridian
+    function getDeviceTime() {
+      const now = new Date();
+      const hours = now.getHours();
+      const minutes = now.getMinutes();
+      const meridian = hours >= 12 ? "PM" : "AM";
+      const formattedHours = String(hours).padStart(2, '0');
+      const formattedMinutes = String(minutes).padStart(2, '0');
+      return {
+        timeStr: `${formattedHours}:${formattedMinutes}`,
+        meridian: meridian
+      };
+    }
+
+    function updateMeridianUI(meridian) {
+      formData.timeMeridian = meridian;
+      const btnAM = document.getElementById('btnTimeAM');
+      const btnPM = document.getElementById('btnTimePM');
+      if (btnAM && btnPM) {
+        if (meridian === "AM") {
+          btnAM.style.backgroundColor = "var(--btn-active)";
+          btnAM.style.color = "#fff";
+          btnAM.classList.remove('opacity-70');
+          btnPM.style.backgroundColor = "var(--bg-card)";
+          btnPM.classList.add('opacity-70');
+        } else {
+          btnPM.style.backgroundColor = "var(--btn-active)";
+          btnPM.style.color = "#fff";
+          btnPM.classList.remove('opacity-70');
+          btnAM.style.backgroundColor = "var(--bg-card)";
+          btnAM.classList.add('opacity-70');
+        }
+      }
+    }
+
+    // Reset Form to 100% Blank State (No Pre-populated Mock Data)
+    function resetToBlankEntry() {
+      activeRecordId = null;
+      const devTime = getDeviceTime();
+      formData = {
+        locality: "",
+        sector: "",
+        date: new Date().toISOString().split('T')[0],
+        time: devTime.timeStr,
+        timeMeridian: devTime.meridian,
+        visitors: "",
+        entered: false,
+        events: { nesting: false, erosion: false, fox: false, dog: false, pig: false, goanna: false },
+        species: "",
+        tags: [
+          { status: "RECAP", number: "", pos: "L1" },
+          { status: "NEW", number: "", pos: "R1" }
+        ],
+        tagScar: "",
+        pitTag: "",
+        tagInNest: "",
+        carapace1: "",
+        carapaceName1: "",
+        carapace2: "",
+        carapaceName2: "",
+        damage: { carapace: false, lff: false, rff: false, lhf: false, rhf: false, fibro: false, lumps: false, other: "" },
+        commensals: { chelonibia: false, burrowing: false, algae: false, mud: false, other: "" },
+        nestingActivity: "",
+        disturbance: "",
+        eggChambers: "",
+        nestLocation: "",
+        nestHabitat: "",
+        clutchDest: { eggs: "", tag: "", date: "" },
+        mapMode: "beach",
+        lat: "",
+        long: "",
+        post1: "",
+        post1Dist: "",
+        post2: "",
+        post2Dist: "",
+        orientation: "",
+        plotCode: "",
+        plot: "",
+        row: "",
+        knot: "",
+        nestDepthTop: "",
+        nestDepthBottom: "",
+        clutchRelocation: "",
+        reloDugBy: "",
+        clutchCount: "",
+        yolkless: "",
+        multiYolk: "",
+        notes: "",
+        processedBy: "",
+        completedBy: ""
+      };
+
+      // Reset Inputs
+      document.getElementById('inpLocality').value = "";
+      document.getElementById('localityDisplayLabel').textContent = "Select Locality...";
+      document.getElementById('localityDisplayLabel').classList.add('opacity-75');
+      document.getElementById('inpSector').value = "";
+      document.getElementById('inpDate').value = formData.date;
+      document.getElementById('inpTime').value = devTime.timeStr;
+      updateMeridianUI(devTime.meridian);
+      document.getElementById('inpVisitors').value = "";
+      document.getElementById('chkEntered').checked = false;
+
+      // Event Checkboxes
+      document.getElementById('chkEventNesting').checked = false;
+      document.getElementById('chkEventErosion').checked = false;
+      document.getElementById('chkEventFox').checked = false;
+      document.getElementById('chkEventDog').checked = false;
+      document.getElementById('chkEventPig').checked = false;
+      document.getElementById('chkEventGoanna').checked = false;
+
+      // Species Buttons
+      document.getElementById('inpSpecies').value = "";
+      document.querySelectorAll('.species-btn').forEach(b => {
+        b.style.backgroundColor = "var(--bg-card)";
+        b.style.borderColor = "var(--border)";
+        b.style.color = "var(--text-main)";
+      });
+
+      // Tags
+      const tagsContainer = document.getElementById('tagsContainer');
+      tagsContainer.innerHTML = `
+        <div class="p-3 rounded-lg border grid grid-cols-12 gap-2 items-center" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div class="col-span-3 sm:col-span-2">
+            <select class="tag-status w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+              <option value="RECAP">RECAP</option>
+              <option value="NEW">NEW</option>
+            </select>
+          </div>
+          <div class="col-span-6 sm:col-span-6">
+            <input type="text" value="" placeholder="Tag No. (e.g. K12345)" class="tag-number uppercase w-full touch-target rounded px-3 py-1.5 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+          </div>
+          <div class="col-span-3 sm:col-span-4 flex items-center space-x-1">
+            <select class="tag-pos w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+              <option value="L1">Pos: L1 (Left Flipper Prox)</option>
+              <option value="R1">Pos: R1 (Right Flipper Prox)</option>
+              <option value="L2">Pos: L2 (Left Flipper Dist)</option>
+              <option value="R2">Pos: R2 (Right Flipper Dist)</option>
+              <option value="L3">Pos: L3</option>
+              <option value="R3">Pos: R3</option>
+            </select>
+          </div>
+        </div>
+        <div class="p-3 rounded-lg border grid grid-cols-12 gap-2 items-center" style="background-color: var(--bg-card); border-color: var(--border);">
+          <div class="col-span-3 sm:col-span-2">
+            <select class="tag-status w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+              <option value="NEW">NEW</option>
+              <option value="RECAP">RECAP</option>
+            </select>
+          </div>
+          <div class="col-span-6 sm:col-span-6">
+            <input type="text" value="" placeholder="Tag No. (e.g. T67890)" class="tag-number uppercase w-full touch-target rounded px-3 py-1.5 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+          </div>
+          <div class="col-span-3 sm:col-span-4 flex items-center space-x-1">
+            <select class="tag-pos w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+              <option value="R1">Pos: R1 (Right Flipper Prox)</option>
+              <option value="L1">Pos: L1 (Left Flipper Prox)</option>
+              <option value="R2">Pos: R2 (Right Flipper Dist)</option>
+              <option value="L2">Pos: L2 (Left Flipper Dist)</option>
+            </select>
+          </div>
+        </div>
+      `;
+
+      // Tag Scar & Tag In Nest
+      document.getElementById('inpTagScar').value = "";
+      document.getElementById('btnScarNo').style.backgroundColor = "var(--bg-card)";
+      document.getElementById('btnScarNo').classList.add('opacity-75');
+      document.getElementById('btnScarYes').style.backgroundColor = "var(--bg-card)";
+      document.getElementById('btnScarYes').classList.add('opacity-75');
+
+      document.getElementById('inpTagInNest').value = "";
+      document.getElementById('btnTagInNestNo').style.backgroundColor = "var(--bg-card)";
+      document.getElementById('btnTagInNestNo').classList.add('opacity-75');
+      document.getElementById('btnTagInNestYes').style.backgroundColor = "var(--bg-card)";
+      document.getElementById('btnTagInNestYes').classList.add('opacity-75');
+
+      document.getElementById('inpPITTag').value = "";
+
+      // Carapace
+      document.getElementById('inpCarapace1').value = "";
+      document.getElementById('inpCarapaceName1').value = "";
+      document.getElementById('inpCarapace2').value = "";
+      document.getElementById('inpCarapaceName2').value = "";
+
+      // Damage & Commensals
+      document.getElementById('chkDmgCarapace').checked = false;
+      document.getElementById('chkDmgLFF').checked = false;
+      document.getElementById('chkDmgRFF').checked = false;
+      document.getElementById('chkDmgLHF').checked = false;
+      document.getElementById('chkDmgRHF').checked = false;
+      document.getElementById('chkDmgFibro').checked = false;
+      document.getElementById('chkDmgLumps').checked = false;
+      document.getElementById('inpDmgOther').value = "";
+
+      document.getElementById('chkComChelonibia').checked = false;
+      document.getElementById('chkComBurrowing').checked = false;
+      document.getElementById('chkComAlgae').checked = false;
+      document.getElementById('chkComMud').checked = false;
+      document.getElementById('inpComOther').value = "";
+
+      // Nesting Activity
+      document.getElementById('inpNestingActivity').value = "";
+      document.querySelectorAll('.activity-btn').forEach(b => {
+        b.style.backgroundColor = "var(--bg-card)";
+        b.style.borderColor = "var(--border)";
+        b.style.color = "var(--text-main)";
+        b.classList.add('opacity-80');
+      });
+
+      document.getElementById('inpDisturbance').value = "";
+      document.getElementById('inpEggChambers').value = "";
+
+      // Radios
+      document.querySelectorAll('input[name="nestLocation"]').forEach(r => r.checked = false);
+      document.querySelectorAll('input[name="nestHabitat"]').forEach(r => r.checked = false);
+
+      // Clutch Dest
+      document.getElementById('inpClutchDestEggs').value = "";
+      document.getElementById('inpClutchDestTag').value = "";
+      document.getElementById('inpClutchDestDate').value = "";
+
+      // Mapping & GPS
+      document.getElementById('inpLat').value = "";
+      document.getElementById('inpLong').value = "";
+      document.getElementById('gpsStatus').textContent = "Click Capture Beach GPS to fetch coordinates";
+      document.getElementById('inpPost1').value = "";
+      document.getElementById('inpPost1Dist').value = "";
+      document.getElementById('inpPost2').value = "";
+      document.getElementById('inpPost2Dist').value = "";
+      document.getElementById('inpHatcheryOrientation').value = "";
+      document.getElementById('btnLandward').style.backgroundColor = "var(--bg-secondary)";
+      document.getElementById('btnLandward').classList.add('opacity-75');
+      document.getElementById('btnSeaward').style.backgroundColor = "var(--bg-secondary)";
+      document.getElementById('btnSeaward').classList.add('opacity-75');
+
+      document.getElementById('inpPlotCode').value = "";
+      document.getElementById('inpPlot').value = "";
+      document.getElementById('inpRow').value = "";
+      document.getElementById('inpKnot').value = "";
+
+      // Depths & Relo
+      document.getElementById('inpDepthTop').value = "";
+      document.getElementById('inpDepthBottom').value = "";
+      document.getElementById('inpClutchRelo').value = "";
+      document.getElementById('btnReloNo').style.backgroundColor = "var(--bg-secondary)";
+      document.getElementById('btnReloNo').classList.add('opacity-75');
+      document.getElementById('btnReloYes').style.backgroundColor = "var(--bg-secondary)";
+      document.getElementById('btnReloYes').classList.add('opacity-75');
+      document.getElementById('panelReloDetails').classList.add('hidden');
+      document.getElementById('inpReloDugBy').value = "";
+      document.getElementById('inpClutchCount').value = "";
+      document.getElementById('inpYolkless').value = "";
+      document.getElementById('inpMultiYolk').value = "";
+
+      // Recorders & Notes
+      document.getElementById('inpNotes').value = "";
+      document.getElementById('inpProcessedBy').value = "";
+      document.getElementById('inpCompletedBy').value = "";
+      document.getElementById('photoStatusText').textContent = "No photo attached yet";
+
+      // Reset locality options checkmarks
+      document.querySelectorAll('.loc-opt-btn').forEach(b => {
+        b.classList.remove('border-sky-500');
+        const chk = b.querySelector('.loc-check');
+        if (chk) chk.classList.add('hidden');
+      });
+
+      goToStep(1);
+      syncPaperView();
+      updateTurtleVisuals();
+    }
+
+    // Step Navigation
+    function goToStep(step) {
+      if (step < 1 || step > totalSteps) return;
+      currentStep = step;
+
+      // Update section visibility
+      for (let i = 1; i <= totalSteps; i++) {
+        const sec = document.getElementById('stepSection' + i);
+        if (sec) {
+          if (i === currentStep) sec.classList.remove('hidden');
+          else sec.classList.add('hidden');
+        }
+      }
+
+      // Update progress bar & text
+      const progressEl = document.getElementById('stepProgressBar');
+      const badgeEl = document.getElementById('stepBadge');
+      const titleEl = document.getElementById('stepTitle');
+      const btnNext = document.getElementById('btnNextStep');
+      const btnPrev = document.getElementById('btnPrevStep');
+
+      const titles = [
+        "Encounter & Beach Context",
+        "Turtle Identification & Tagging",
+        "Morphology, Health & Anatomy",
+        "Nesting Activity & Habitat",
+        "Nest Mapping & Clutch Data",
+        "Photos, Notes & Sign-Off"
+      ];
+
+      if (progressEl) progressEl.style.width = ((currentStep / totalSteps) * 100) + '%';
+      if (badgeEl) badgeEl.textContent = `Phase ${currentStep} of ${totalSteps}`;
+      if (titleEl) titleEl.textContent = titles[currentStep - 1];
+
+      // Update step pills
+      document.querySelectorAll('.step-pill').forEach(pill => {
+        const s = parseInt(pill.getAttribute('data-step'), 10);
+        if (s === currentStep) {
+          pill.style.backgroundColor = "var(--btn-active)";
+          pill.style.color = "#ffffff";
+          pill.classList.remove('opacity-70');
+        } else {
+          pill.style.backgroundColor = "transparent";
+          pill.style.color = "var(--text-main)";
+          pill.classList.add('opacity-70');
+        }
+      });
+
+      // Update button states
+      if (btnPrev) {
+        if (currentStep === 1) btnPrev.classList.add('invisible');
+        else btnPrev.classList.remove('invisible');
+      }
+      if (btnNext) {
+        if (currentStep === totalSteps) {
+          btnNext.textContent = "Review & Finalize ✓";
+        } else {
+          btnNext.textContent = "Next Phase →";
+        }
+      }
+
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Two-way Sync: UI to State
+    function syncStateFromUI() {
+      formData.locality = document.getElementById('inpLocality').value;
+      formData.sector = document.getElementById('inpSector').value;
+      formData.date = document.getElementById('inpDate').value;
+      formData.time = document.getElementById('inpTime').value;
+      formData.visitors = document.getElementById('inpVisitors').value;
+      formData.entered = document.getElementById('chkEntered').checked;
+
+      formData.events.nesting = document.getElementById('chkEventNesting').checked;
+      formData.events.erosion = document.getElementById('chkEventErosion').checked;
+      formData.events.fox = document.getElementById('chkEventFox').checked;
+      formData.events.dog = document.getElementById('chkEventDog').checked;
+      formData.events.pig = document.getElementById('chkEventPig').checked;
+      formData.events.goanna = document.getElementById('chkEventGoanna').checked;
+
+      formData.species = document.getElementById('inpSpecies').value;
+      formData.tagScar = document.getElementById('inpTagScar').value;
+      formData.pitTag = document.getElementById('inpPITTag').value;
+      formData.tagInNest = document.getElementById('inpTagInNest').value;
+
+      formData.carapace1 = document.getElementById('inpCarapace1').value;
+      formData.carapaceName1 = document.getElementById('inpCarapaceName1').value;
+      formData.carapace2 = document.getElementById('inpCarapace2').value;
+      formData.carapaceName2 = document.getElementById('inpCarapaceName2').value;
+
+      formData.damage.carapace = document.getElementById('chkDmgCarapace').checked;
+      formData.damage.lff = document.getElementById('chkDmgLFF').checked;
+      formData.damage.rff = document.getElementById('chkDmgRFF').checked;
+      formData.damage.lhf = document.getElementById('chkDmgLHF').checked;
+      formData.damage.rhf = document.getElementById('chkDmgRHF').checked;
+      formData.damage.fibro = document.getElementById('chkDmgFibro').checked;
+      formData.damage.lumps = document.getElementById('chkDmgLumps').checked;
+      formData.damage.other = document.getElementById('inpDmgOther').value;
+
+      formData.commensals.chelonibia = document.getElementById('chkComChelonibia').checked;
+      formData.commensals.burrowing = document.getElementById('chkComBurrowing').checked;
+      formData.commensals.algae = document.getElementById('chkComAlgae').checked;
+      formData.commensals.mud = document.getElementById('chkComMud').checked;
+      formData.commensals.other = document.getElementById('inpComOther').value;
+
+      formData.nestingActivity = document.getElementById('inpNestingActivity').value;
+      formData.disturbance = document.getElementById('inpDisturbance').value;
+      formData.eggChambers = document.getElementById('inpEggChambers').value;
+
+      const locRadio = document.querySelector('input[name="nestLocation"]:checked');
+      formData.nestLocation = locRadio ? locRadio.value : "";
+
+      const habRadio = document.querySelector('input[name="nestHabitat"]:checked');
+      formData.nestHabitat = habRadio ? habRadio.value : "";
+
+      formData.lat = document.getElementById('inpLat').value;
+      formData.long = document.getElementById('inpLong').value;
+      formData.post1 = document.getElementById('inpPost1').value;
+      formData.post1Dist = document.getElementById('inpPost1Dist').value;
+      formData.post2 = document.getElementById('inpPost2').value;
+      formData.post2Dist = document.getElementById('inpPost2Dist').value;
+
+      formData.plotCode = document.getElementById('inpPlotCode').value;
+      formData.plot = document.getElementById('inpPlot').value;
+      formData.row = document.getElementById('inpRow').value;
+      formData.knot = document.getElementById('inpKnot').value;
+
+      formData.nestDepthTop = document.getElementById('inpDepthTop').value;
+      formData.nestDepthBottom = document.getElementById('inpDepthBottom').value;
+
+      formData.clutchRelocation = document.getElementById('inpClutchRelo').value;
+      formData.reloDugBy = document.getElementById('inpReloDugBy').value;
+      formData.clutchCount = document.getElementById('inpClutchCount').value;
+      formData.yolkless = document.getElementById('inpYolkless').value;
+      formData.multiYolk = document.getElementById('inpMultiYolk').value;
+
+      formData.notes = document.getElementById('inpNotes').value;
+      formData.processedBy = document.getElementById('inpProcessedBy').value;
+      formData.completedBy = document.getElementById('inpCompletedBy').value;
+
+      // Extract dynamic tags from container
+      const rows = document.querySelectorAll('#tagsContainer > div');
+      formData.tags = [];
+      rows.forEach(r => {
+        const st = r.querySelector('.tag-status').value;
+        const num = r.querySelector('.tag-number').value.trim();
+        const pos = r.querySelector('.tag-pos').value;
+        formData.tags.push({ status: st, number: num, pos: pos });
+      });
+
+      // Update Paper View Mirror with STRICT user entered data
+      syncPaperView();
+
+      // Check biological validations
+      validateBiology();
+    }
+
+    // Populate Paper Datasheet (Reflects ONLY user entered values, completely empty if not entered)
+    function syncPaperView() {
+      const getVal = (v) => (v !== undefined && v !== null && v !== "") ? v : "";
+
+      document.getElementById('paperEntered').textContent = formData.entered ? "✓" : "";
+      document.getElementById('paperLocality').textContent = getVal(formData.locality);
+      document.getElementById('paperSector').textContent = getVal(formData.sector);
+      document.getElementById('paperDate').textContent = getVal(formData.date);
+      document.getElementById('paperTime').textContent = formData.time ? `${formData.time} ${formData.timeMeridian.toLowerCase()}` : "";
+      document.getElementById('paperVisitors').textContent = getVal(formData.visitors);
+
+      document.getElementById('paperSpecies').textContent = getVal(formData.species);
+
+      // Tag Scar
+      document.getElementById('paperTagScar').textContent = formData.tagScar ? formData.tagScar.toUpperCase() : "";
+      document.getElementById('paperPIT').textContent = getVal(formData.pitTag);
+      document.getElementById('paperTagInNest').textContent = formData.tagInNest ? formData.tagInNest.toUpperCase() : "";
+
+      // Events
+      document.getElementById('paperEvNesting').textContent = formData.events.nesting ? "●" : "o";
+      document.getElementById('paperEvErosion').textContent = formData.events.erosion ? "●" : "o";
+      document.getElementById('paperEvFox').textContent = formData.events.fox ? "●" : "o";
+      document.getElementById('paperEvDog').textContent = formData.events.dog ? "●" : "o";
+      document.getElementById('paperEvPig').textContent = formData.events.pig ? "●" : "o";
+      document.getElementById('paperEvGoanna').textContent = formData.events.goanna ? "●" : "o";
+
+      // Activity
+      document.getElementById('paperActLaid').textContent = formData.nestingActivity === 'laid' ? "●" : "o";
+      document.getElementById('paperActNoLay').textContent = formData.nestingActivity === 'no lay' ? "●" : "o";
+      document.getElementById('paperActLaidDis').textContent = formData.nestingActivity === 'laid/dis' ? "●" : "o";
+      document.getElementById('paperDisturbance').textContent = getVal(formData.disturbance);
+      document.getElementById('paperEggChambers').textContent = getVal(formData.eggChambers);
+
+      // Carapace
+      document.getElementById('pCarapace1').textContent = getVal(formData.carapace1);
+      document.getElementById('pCaraName1').textContent = getVal(formData.carapaceName1);
+      document.getElementById('pCarapace2').textContent = getVal(formData.carapace2);
+      document.getElementById('pCaraName2').textContent = getVal(formData.carapaceName2);
+
+      // Damage
+      document.getElementById('pDmgCarapace').textContent = formData.damage.carapace ? "●" : "o";
+      document.getElementById('pDmgLFF').textContent = formData.damage.lff ? "●" : "o";
+      document.getElementById('pDmgRFF').textContent = formData.damage.rff ? "●" : "o";
+      document.getElementById('pDmgLHF').textContent = formData.damage.lhf ? "●" : "o";
+      document.getElementById('pDmgRHF').textContent = formData.damage.rhf ? "●" : "o";
+      document.getElementById('pDmgFibro').textContent = formData.damage.fibro ? "●" : "o";
+      document.getElementById('pDmgLumps').textContent = formData.damage.lumps ? "●" : "o";
+      document.getElementById('pDmgOther').textContent = getVal(formData.damage.other);
+
+      // Commensals
+      document.getElementById('pComChel').textContent = formData.commensals.chelonibia ? "●" : "o";
+      document.getElementById('pComBurr').textContent = formData.commensals.burrowing ? "●" : "o";
+      document.getElementById('pComAlgae').textContent = formData.commensals.algae ? "●" : "o";
+      document.getElementById('pComMud').textContent = formData.commensals.mud ? "●" : "o";
+      document.getElementById('pComOther').textContent = getVal(formData.commensals.other);
+
+      // Nest Location
+      document.getElementById('pLocDune2').textContent = formData.nestLocation === "dune 2nd" ? "●" : "o";
+      document.getElementById('pLocDune1').textContent = formData.nestLocation === "dune 1st" ? "●" : "o";
+      document.getElementById('pLocGrass').textContent = formData.nestLocation === "grass slope" ? "●" : "o";
+      document.getElementById('pLocBelow').textContent = formData.nestLocation === "below slope" ? "●" : "o";
+      document.getElementById('pLocHW').textContent = formData.nestLocation === "below HW" ? "●" : "o";
+
+      // Nest Habitat
+      document.getElementById('pHabSand').textContent = formData.nestHabitat === "bare sand" ? "●" : "o";
+      document.getElementById('pHabGrass').textContent = formData.nestHabitat === "in grass" ? "●" : "o";
+      document.getElementById('pHabTree').textContent = formData.nestHabitat === "under tree" ? "●" : "o";
+      document.getElementById('pHabShrub').textContent = formData.nestHabitat === "under shrub" ? "●" : "o";
+
+      // Mapping
+      document.getElementById('pPlot').textContent = getVal(formData.plot);
+      document.getElementById('pRow').textContent = getVal(formData.row);
+      document.getElementById('pKnot').textContent = getVal(formData.knot);
+
+      document.getElementById('pPost1').textContent = getVal(formData.post1);
+      document.getElementById('pPost1D').textContent = getVal(formData.post1Dist);
+      document.getElementById('pPost2').textContent = getVal(formData.post2);
+      document.getElementById('pPost2D').textContent = getVal(formData.post2Dist);
+      document.getElementById('pOrient').textContent = getVal(formData.orientation);
+      document.getElementById('pLat').textContent = getVal(formData.lat);
+      document.getElementById('pLong').textContent = getVal(formData.long);
+
+      // Depths & Relo
+      document.getElementById('pDepthTop').textContent = getVal(formData.nestDepthTop);
+      document.getElementById('pDepthBottom').textContent = getVal(formData.nestDepthBottom);
+      document.getElementById('pRelo').textContent = formData.clutchRelocation ? formData.clutchRelocation.toUpperCase() : "";
+      document.getElementById('pReloDug').textContent = getVal(formData.reloDugBy);
+      document.getElementById('pClutchCount').textContent = getVal(formData.clutchCount);
+      document.getElementById('pYolkless').textContent = getVal(formData.yolkless);
+      document.getElementById('pMulti').textContent = getVal(formData.multiYolk);
+
+      // Recorders & Notes
+      document.getElementById('pProcessed').textContent = getVal(formData.processedBy);
+      document.getElementById('pCompleted').textContent = getVal(formData.completedBy);
+      document.getElementById('pNotes').textContent = getVal(formData.notes);
+
+      // Flipper Tag rows
+      const recapTags = formData.tags.filter(t => t.status === "RECAP" && t.number);
+      const newTags = formData.tags.filter(t => t.status === "NEW" && t.number);
+      document.getElementById('paperRecapTags').textContent = recapTags.map(t => t.number).join(', ');
+      document.getElementById('paperRecapPos').textContent = recapTags.map(t => t.pos).join(', ');
+      document.getElementById('paperNewTags').textContent = newTags.map(t => t.number).join(', ');
+      document.getElementById('paperNewPos').textContent = newTags.map(t => t.pos).join(', ');
+    }
+
+    // Validation Guardrails
+    function validateBiology() {
+      const warnEl = document.getElementById('carapaceWarning');
+      if (warnEl) {
+        const ccl = parseFloat(formData.carapace1);
+        if (formData.species === "Loggerhead" && !isNaN(ccl) && ccl > 0 && (ccl < 75 || ccl > 120)) {
+          warnEl.classList.remove('hidden');
+        } else {
+          warnEl.classList.add('hidden');
+        }
+      }
+    }
+
+    // Interactive Turtle SVG Sync
+    function updateTurtleVisuals() {
+      const map = {
+        'part_Carapace': formData.damage.carapace,
+        'part_LFF': formData.damage.lff,
+        'part_RFF': formData.damage.rff,
+        'part_LHF': formData.damage.lhf,
+        'part_RHF': formData.damage.rhf
+      };
+
+      for (const [partId, isDamaged] of Object.entries(map)) {
+        const el = document.getElementById(partId);
+        if (el) {
+          if (isDamaged) {
+            el.setAttribute('fill', '#ef4444');
+            el.setAttribute('stroke', '#b91c1c');
+            el.setAttribute('stroke-width', '3');
+          } else {
+            el.setAttribute('fill', '#334155');
+            el.setAttribute('stroke', '#94a3b8');
+            el.setAttribute('stroke-width', '2');
+          }
+        }
+      }
+    }
+
+    // CSV Data Generation
+    const CSV_HEADERS = ["Date", "Time", "Locality", "Sector", "Species", "Recap_Tags", "New_Tags", "PIT_Tag", "CCL_1_cm", "CCL_2_cm", "Egg_Chambers", "Nesting_Activity", "Nest_Location", "Nest_Habitat", "Lat", "Long", "Depth_Top_cm", "Depth_Bottom_cm", "Clutch_Relocated", "Clutch_Count", "Processed_By", "Datasheet_By"];
+
+    function buildCsvRow(rec) {
+      return [
+        rec.date || '',
+        rec.time || '',
+        `"${rec.locality || ''}"`,
+        `"${rec.sector || ''}"`,
+        rec.species || '',
+        `"${rec.tagNo ? rec.tagNo + '(' + (rec.tagPos || '') + ')' : ''}"`,
+        `"${rec.newTag || ''}"`,
+        rec.pitTag || '',
+        rec.ccl1 || '',
+        rec.ccl2 || '',
+        rec.eggChambers || '',
+        rec.activity || '',
+        `"${rec.nestLocation || ''}"`,
+        `"${rec.nestHabitat || ''}"`,
+        rec.lat || '',
+        rec.long || '',
+        rec.depthTop || '',
+        rec.depthBottom || '',
+        rec.clutchRelo || '',
+        rec.clutchCount || '',
+        `"${rec.processedBy || ''}"`,
+        `"${rec.completedBy || ''}"`
+      ].join(',');
+    }
+
+    function renderShiftCsvLog() {
+      const tbody = document.getElementById('csvRecordsTableBody');
+      const badge = document.getElementById('shiftCountBadge');
+      const rawText = document.getElementById('rawCsvTextarea');
+
+      if (badge) badge.textContent = `${shiftRecords.length} In Log`;
+
+      if (tbody) {
+        tbody.innerHTML = '';
+        if (shiftRecords.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center opacity-70 italic">No nesting clutches saved in this shift yet. Enter turtle data and click "Save to CSV Log".</td></tr>`;
+        } else {
+          shiftRecords.forEach((rec, idx) => {
+            const tr = document.createElement('tr');
+            tr.className = "hover:bg-opacity-50";
+            tr.innerHTML = `
+              <td class="p-2 font-mono font-bold">${idx + 1}</td>
+              <td class="p-2">${rec.time || '—'}</td>
+              <td class="p-2 truncate max-w-[130px] font-semibold">${rec.locality || '—'}</td>
+              <td class="p-2">${rec.species || '—'}</td>
+              <td class="p-2 font-mono">${rec.tagNo || '—'}</td>
+              <td class="p-2">${rec.activity || '—'}</td>
+              <td class="p-2 font-bold">${rec.clutchCount || '—'}</td>
+              <td class="p-2 font-mono text-[10px]">${rec.lat || '—'}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+
+      if (rawText) {
+        const rows = shiftRecords.map(r => buildCsvRow(r));
+        rawText.value = CSV_HEADERS.join(',') + '\n' + rows.join('\n');
+      }
+
+      // Persist to localStorage safely
+      try {
+        localStorage.setItem('qtcp_shift_records', JSON.stringify(shiftRecords));
+      } catch (err) {
+        // localStorage gracefully handled
+      }
+    }
+
+    function commitCurrentRecordToShift(replaceConfirmed = false) {
+      syncStateFromUI();
+
+      // Check if this form session is already saved in shiftRecords
+      if (!replaceConfirmed && activeRecordId && shiftRecords.some(r => r.id === activeRecordId)) {
+        const dupModal = document.getElementById("duplicateModal");
+        const label = document.getElementById("dupRecordIdLabel");
+        if (label) label.textContent = activeRecordId;
+        if (dupModal) dupModal.classList.remove("hidden");
+        return;
+      }
+
+      const recapTags = formData.tags.filter(t => t.status === "RECAP" && t.number);
+      const newTags = formData.tags.filter(t => t.status === "NEW" && t.number);
+
+      if (replaceConfirmed && activeRecordId) {
+        const idx = shiftRecords.findIndex(r => r.id === activeRecordId);
+        if (idx !== -1) {
+          shiftRecords[idx] = {
+            id: activeRecordId,
+            date: formData.date,
+            time: formData.time ? `${formData.time} ${formData.timeMeridian}` : "",
+            locality: formData.locality,
+            sector: formData.sector,
+            species: formData.species,
+            tagNo: recapTags.map(t => t.number).join(';'),
+            tagPos: recapTags.map(t => t.pos).join(';'),
+            newTag: newTags.map(t => `${t.number}(${t.pos})`).join(';'),
+            pitTag: formData.pitTag,
+            ccl1: formData.carapace1,
+            ccl2: formData.carapace2,
+            eggChambers: formData.eggChambers,
+            activity: formData.nestingActivity,
+            nestLocation: formData.nestLocation,
+            nestHabitat: formData.nestHabitat,
+            lat: formData.lat,
+            long: formData.long,
+            depthTop: formData.nestDepthTop,
+            depthBottom: formData.nestDepthBottom,
+            clutchRelo: formData.clutchRelocation,
+            clutchCount: formData.clutchCount,
+            processedBy: formData.processedBy,
+            completedBy: formData.completedBy
+          };
+          renderShiftCsvLog();
+          showToast(`Existing entry ${activeRecordId} successfully replaced in CSV log!`, "🔄");
+          return;
+        }
+      }
+
+      const newId = "REC-" + String(shiftRecords.length + 1).padStart(3, '0');
+      activeRecordId = newId;
+      
+
+      const newRec = {
+        id: "REC-" + String(shiftRecords.length + 1).padStart(3, "0"),
+        date: formData.date,
+        time: formData.time ? `${formData.time} ${formData.timeMeridian}` : "",
+        locality: formData.locality,
+        sector: formData.sector,
+        species: formData.species,
+        tagNo: recapTags.map(t => t.number).join(';'),
+        tagPos: recapTags.map(t => t.pos).join(';'),
+        newTag: newTags.map(t => `${t.number}(${t.pos})`).join(';'),
+        pitTag: formData.pitTag,
+        ccl1: formData.carapace1,
+        ccl2: formData.carapace2,
+        eggChambers: formData.eggChambers,
+        activity: formData.nestingActivity,
+        nestLocation: formData.nestLocation,
+        nestHabitat: formData.nestHabitat,
+        lat: formData.lat,
+        long: formData.long,
+        depthTop: formData.nestDepthTop,
+        depthBottom: formData.nestDepthBottom,
+        clutchRelo: formData.clutchRelocation,
+        clutchCount: formData.clutchCount,
+        processedBy: formData.processedBy,
+        completedBy: formData.completedBy
+      };
+
+      shiftRecords.push(newRec);
+      renderShiftCsvLog();
+      showToast(`Nest committed to CSV Log! ID: ${newId} (Total: ${shiftRecords.length})`, "✅");
+    }
+
+    // Direct Printable HTML Generation (Safe for Sandboxed Iframe)
+    function downloadPrintableDatasheet() {
+      syncStateFromUI();
+      const sheetContent = document.getElementById('paperSheetContainer').outerHTML;
+      const fullHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>QTCP_Datasheet_${formData.date}_${formData.species || 'Unidentified'}</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; margin: 20px; background: #fff; color: #000; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { border: 1.5px solid #000; padding: 4px; font-size: 11px; }
+    .paper-sheet { max-width: 800px; margin: 0 auto; border: 2px solid #000; padding: 16px; }
+    @media print { body { margin: 0; } .paper-sheet { border: none; } }
+  </style>
+</head>
+<body onload="window.print()">
+  <div class="paper-sheet">
+    ${sheetContent}
+  </div>
+</body>
+</html>`;
+
+      const blob = new Blob([fullHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `QTCP_Datasheet_${formData.date}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Standalone printable datasheet downloaded! Double-click file to print.", "📄");
+    }
+
+    // Setup Event Listeners
+    window.addEventListener('DOMContentLoaded', () => {
+      
+      // Load previous shift records if any
+      try {
+        const saved = localStorage.getItem('qtcp_shift_records');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            shiftRecords = parsed;
+          }
+        }
+      } catch (e) {
+        // storage fallback
+      }
+
+      // Start fresh with 100% clean blank entry
+      resetToBlankEntry();
+
+      // Render CSV records
+      renderShiftCsvLog();
+
+      // Top Quick "New Blank Entry" Button
+      document.getElementById('btnNewBlankRecord').addEventListener('click', () => {
+        resetToBlankEntry();
+        showToast("Started fresh blank entry. All fields cleared.", "✨");
+      });
+
+      // Step Buttons
+      document.getElementById('btnNextStep').addEventListener('click', () => {
+        syncStateFromUI();
+        if (currentStep < totalSteps) {
+          goToStep(currentStep + 1);
+        } else {
+          // Finalize: switch to paper view or trigger summary
+          document.getElementById('btnViewPaper').click();
+          showToast("Review complete! Check your official paper replica.", "📋");
+        }
+      });
+
+      document.getElementById('btnPrevStep').addEventListener('click', () => {
+        syncStateFromUI();
+        goToStep(currentStep - 1);
+      });
+
+      document.querySelectorAll('.step-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+          syncStateFromUI();
+          const s = parseInt(pill.getAttribute('data-step'), 10);
+          goToStep(s);
+        });
+      });
+
+      // Quick Save from Stepper Bottom Bar
+      document.getElementById('btnQuickSaveRecord').addEventListener('click', () => {
+        commitCurrentRecordToShift();
+      });
+
+      // View Mode Toggle (Flow vs Paper)
+      const btnFlow = document.getElementById('btnViewFlow');
+      const btnPaper = document.getElementById('btnViewPaper');
+      const viewFlow = document.getElementById('viewFlow');
+      const viewPaper = document.getElementById('viewPaper');
+
+      btnFlow.addEventListener('click', () => {
+        viewFlow.classList.remove('hidden');
+        viewPaper.classList.add('hidden');
+        btnFlow.style.backgroundColor = "var(--btn-active)";
+        btnFlow.style.color = "#ffffff";
+        btnFlow.classList.remove('opacity-75');
+        btnPaper.style.backgroundColor = "transparent";
+        btnPaper.classList.add('opacity-75');
+      });
+
+      btnPaper.addEventListener('click', () => {
+        syncStateFromUI();
+        viewFlow.classList.add('hidden');
+        viewPaper.classList.remove('hidden');
+        btnPaper.style.backgroundColor = "var(--btn-active)";
+        btnPaper.style.color = "#ffffff";
+        btnPaper.classList.remove('opacity-75');
+        btnFlow.style.backgroundColor = "transparent";
+        btnFlow.classList.add('opacity-75');
+      });
+
+      // Theme Toggles
+      document.getElementById('btnThemeRed').addEventListener('click', () => {
+        document.body.className = "theme-red font-sans antialiased min-h-screen transition-colors duration-200";
+        showToast("Switched to Turtle Red Mode (<620nm scotopic preservation)", "🔴");
+      });
+      document.getElementById('btnThemeDark').addEventListener('click', () => {
+        document.body.className = "theme-dark font-sans antialiased min-h-screen transition-colors duration-200";
+        showToast("Switched to OLED Dark Mode", "🌙");
+      });
+      document.getElementById('btnThemeDay').addEventListener('click', () => {
+        document.body.className = "theme-day font-sans antialiased min-h-screen transition-colors duration-200";
+        showToast("Switched to Daylight Mode", "☀️");
+      });
+
+      // Locality Modal Handlers (Red Night Mode Safe)
+      const locModal = document.getElementById('localityModal');
+      const btnOpenLoc = document.getElementById('btnSelectLocality');
+      const btnCloseLoc = document.getElementById('btnCloseLocalityModal');
+
+      btnOpenLoc.addEventListener('click', () => {
+        locModal.classList.remove('hidden');
+      });
+
+      btnCloseLoc.addEventListener('click', () => {
+        locModal.classList.add('hidden');
+      });
+
+      document.querySelectorAll('.loc-opt-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const chosenLoc = btn.getAttribute('data-loc');
+          document.getElementById('inpLocality').value = chosenLoc;
+          document.getElementById('localityDisplayLabel').textContent = chosenLoc;
+          document.getElementById('localityDisplayLabel').classList.remove('opacity-75');
+          
+          // update checkmarks
+          document.querySelectorAll('.loc-opt-btn').forEach(b => {
+            b.classList.remove('border-sky-500');
+            const chk = b.querySelector('.loc-check');
+            if (chk) chk.classList.add('hidden');
+          });
+          btn.classList.add('border-sky-500');
+          const myChk = btn.querySelector('.loc-check');
+          if (myChk) myChk.classList.remove('hidden');
+
+          locModal.classList.add('hidden');
+          syncStateFromUI();
+          showToast(`Locality set to: ${chosenLoc}`, "📍");
+        });
+      });
+
+      // Shift CSV Log Modal
+      const csvLogModal = document.getElementById('csvLogModal');
+      document.getElementById('btnOpenCsvLog').addEventListener('click', () => {
+        renderShiftCsvLog();
+        csvLogModal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseCsvLog').addEventListener('click', () => {
+        csvLogModal.classList.add('hidden');
+      });
+
+      // CSV Log Tab Switching
+      const btnTabTable = document.getElementById('btnTabRecordsTable');
+      const btnTabRaw = document.getElementById('btnTabRawCsv');
+      const panelTable = document.getElementById('panelRecordsTable');
+      const panelRaw = document.getElementById('panelRawCsv');
+
+      btnTabTable.addEventListener('click', () => {
+        panelTable.classList.remove('hidden');
+        panelRaw.classList.add('hidden');
+        btnTabTable.style.backgroundColor = "var(--btn-active)";
+        btnTabTable.style.color = "#fff";
+        btnTabRaw.style.backgroundColor = "var(--bg-card)";
+      });
+      btnTabRaw.addEventListener('click', () => {
+        panelRaw.classList.remove('hidden');
+        panelTable.classList.add('hidden');
+        btnTabRaw.style.backgroundColor = "var(--btn-active)";
+        btnTabRaw.style.color = "#fff";
+        btnTabTable.style.backgroundColor = "var(--bg-card)";
+      });
+
+      // Download Consolidated Shift CSV
+      document.getElementById('btnDownloadShiftCsv').addEventListener('click', () => {
+        const rows = shiftRecords.map(r => buildCsvRow(r));
+        const csvContent = CSV_HEADERS.join(',') + '\n' + rows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `QTCP_Shift_Nesting_Log_${formData.date}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("Consolidated shift CSV downloaded successfully!", "📊");
+      });
+
+      // Copy CSV text to clipboard
+      document.getElementById('btnCopyCsvText').addEventListener('click', () => {
+        const rawText = document.getElementById('rawCsvTextarea').value;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(rawText).then(() => {
+            showToast("CSV data copied to clipboard!", "📋");
+          }).catch(() => {
+            fallbackCopy(rawText);
+          });
+        } else {
+          fallbackCopy(rawText);
+        }
+      });
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+          showToast("CSV data copied to clipboard!", "📋");
+        } catch (e) {
+          showToast("Please copy manually from Raw CSV view", "⚠️");
+        }
+        document.body.removeChild(ta);
+      }
+
+      // Clear Shift Log
+      document.getElementById('btnClearShiftLog').addEventListener('click', () => {
+        shiftRecords = [];
+        renderShiftCsvLog();
+        showToast("Shift CSV log reset", "🗑️");
+      });
+
+      // Quick Save from Paper view
+      document.getElementById('btnQuickExportCsvFromPaper').addEventListener('click', () => {
+        commitCurrentRecordToShift();
+      });
+
+      // Time AM/PM Buttons & Time Input Listener
+      const btnAM = document.getElementById('btnTimeAM');
+      const btnPM = document.getElementById('btnTimePM');
+      const inpTimeEl = document.getElementById('inpTime');
+
+      btnAM.addEventListener('click', () => {
+        updateMeridianUI("AM");
+        syncPaperView();
+      });
+      btnPM.addEventListener('click', () => {
+        updateMeridianUI("PM");
+        syncPaperView();
+      });
+
+      if (inpTimeEl) {
+        inpTimeEl.addEventListener('change', (e) => {
+          const val = e.target.value;
+          if (val) {
+            const parts = val.split(':');
+            if (parts.length >= 2) {
+              const h = parseInt(parts[0], 10);
+              if (!isNaN(h)) {
+                updateMeridianUI(h >= 12 ? "PM" : "AM");
+              }
+            }
+          }
+          syncStateFromUI();
+        });
+      }
+
+      // Species Buttons
+      document.querySelectorAll('.species-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const sp = btn.getAttribute('data-species');
+          document.getElementById('inpSpecies').value = sp;
+          document.querySelectorAll('.species-btn').forEach(b => {
+            b.style.backgroundColor = "var(--bg-card)";
+            b.style.borderColor = "var(--border)";
+            b.style.color = "var(--text-main)";
+          });
+          btn.style.backgroundColor = "var(--btn-active)";
+          btn.style.borderColor = "var(--accent)";
+          btn.style.color = "#ffffff";
+          syncStateFromUI();
+        });
+      });
+
+      // Activity Buttons
+      document.querySelectorAll('.activity-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const act = btn.getAttribute('data-activity');
+          document.getElementById('inpNestingActivity').value = act;
+          document.querySelectorAll('.activity-btn').forEach(b => {
+            b.style.backgroundColor = "var(--bg-card)";
+            b.style.borderColor = "var(--border)";
+            b.style.color = "var(--text-main)";
+            b.classList.add('opacity-80');
+          });
+          btn.style.backgroundColor = "var(--btn-active)";
+          btn.style.borderColor = "var(--accent)";
+          btn.style.color = "#ffffff";
+          btn.classList.remove('opacity-80');
+          syncStateFromUI();
+        });
+      });
+
+      // Tag Scar Toggle
+      const btnScarNo = document.getElementById('btnScarNo');
+      const btnScarYes = document.getElementById('btnScarYes');
+      btnScarNo.addEventListener('click', () => {
+        document.getElementById('inpTagScar').value = "no";
+        btnScarNo.style.backgroundColor = "var(--btn-active)";
+        btnScarNo.style.color = "#fff";
+        btnScarNo.classList.remove('opacity-75');
+        btnScarYes.style.backgroundColor = "var(--bg-card)";
+        btnScarYes.classList.add('opacity-75');
+        syncStateFromUI();
+      });
+      btnScarYes.addEventListener('click', () => {
+        document.getElementById('inpTagScar').value = "yes";
+        btnScarYes.style.backgroundColor = "var(--btn-active)";
+        btnScarYes.style.color = "#fff";
+        btnScarYes.classList.remove('opacity-75');
+        btnScarNo.style.backgroundColor = "var(--bg-card)";
+        btnScarNo.classList.add('opacity-75');
+        syncStateFromUI();
+      });
+
+      // Tag in Nest Toggle
+      const btnTinNo = document.getElementById('btnTagInNestNo');
+      const btnTinYes = document.getElementById('btnTagInNestYes');
+      btnTinNo.addEventListener('click', () => {
+        document.getElementById('inpTagInNest').value = "no";
+        btnTinNo.style.backgroundColor = "var(--btn-active)";
+        btnTinNo.style.color = "#fff";
+        btnTinNo.classList.remove('opacity-75');
+        btnTinYes.style.backgroundColor = "var(--bg-card)";
+        btnTinYes.classList.add('opacity-75');
+        syncStateFromUI();
+      });
+      btnTinYes.addEventListener('click', () => {
+        document.getElementById('inpTagInNest').value = "yes";
+        btnTinYes.style.backgroundColor = "var(--btn-active)";
+        btnTinYes.style.color = "#fff";
+        btnTinYes.classList.remove('opacity-75');
+        btnTinNo.style.backgroundColor = "var(--bg-card)";
+        btnTinNo.classList.add('opacity-75');
+        syncStateFromUI();
+      });
+
+      // Clutch Relocation Toggle
+      const btnReloNo = document.getElementById('btnReloNo');
+      const btnReloYes = document.getElementById('btnReloYes');
+      const panelRelo = document.getElementById('panelReloDetails');
+      btnReloNo.addEventListener('click', () => {
+        document.getElementById('inpClutchRelo').value = "no";
+        btnReloNo.style.backgroundColor = "var(--btn-active)";
+        btnReloNo.style.color = "#fff";
+        btnReloNo.classList.remove('opacity-75');
+        btnReloYes.style.backgroundColor = "var(--bg-secondary)";
+        btnReloYes.classList.add('opacity-75');
+        panelRelo.classList.add('hidden');
+        syncStateFromUI();
+      });
+      btnReloYes.addEventListener('click', () => {
+        document.getElementById('inpClutchRelo').value = "yes";
+        btnReloYes.style.backgroundColor = "var(--btn-active)";
+        btnReloYes.style.color = "#fff";
+        btnReloYes.classList.remove('opacity-75');
+        btnReloNo.style.backgroundColor = "var(--bg-secondary)";
+        btnReloNo.classList.add('opacity-75');
+        panelRelo.classList.remove('hidden');
+        syncStateFromUI();
+      });
+
+      // Mapping Mode Toggle (Beach vs Hatcheries)
+      const btnMapBeach = document.getElementById('btnMapModeBeach');
+      const btnMapCages = document.getElementById('btnMapModeCages');
+      const pBeach = document.getElementById('panelMapBeach');
+      const pCages = document.getElementById('panelMapCages');
+
+      btnMapBeach.addEventListener('click', () => {
+        formData.mapMode = "beach";
+        btnMapBeach.style.backgroundColor = "var(--btn-active)";
+        btnMapBeach.style.color = "#fff";
+        btnMapBeach.classList.remove('opacity-70');
+        btnMapCages.style.backgroundColor = "var(--bg-card)";
+        btnMapCages.classList.add('opacity-70');
+        pBeach.classList.remove('hidden');
+        pCages.classList.add('hidden');
+      });
+      btnMapCages.addEventListener('click', () => {
+        formData.mapMode = "cages";
+        btnMapCages.style.backgroundColor = "var(--btn-active)";
+        btnMapCages.style.color = "#fff";
+        btnMapCages.classList.remove('opacity-70');
+        btnMapBeach.style.backgroundColor = "var(--bg-card)";
+        btnMapBeach.classList.add('opacity-70');
+        pCages.classList.remove('hidden');
+        pBeach.classList.add('hidden');
+      });
+
+      // Orientation Landward vs Seaward
+      const btnLandward = document.getElementById('btnLandward');
+      const btnSeaward = document.getElementById('btnSeaward');
+      btnLandward.addEventListener('click', () => {
+        formData.orientation = "landward";
+        document.getElementById('inpHatcheryOrientation').value = "landward";
+        btnLandward.style.backgroundColor = "var(--btn-active)";
+        btnLandward.style.color = "#fff";
+        btnLandward.classList.remove('opacity-75');
+        btnSeaward.style.backgroundColor = "var(--bg-secondary)";
+        btnSeaward.classList.add('opacity-75');
+        syncPaperView();
+      });
+      btnSeaward.addEventListener('click', () => {
+        formData.orientation = "seaward";
+        document.getElementById('inpHatcheryOrientation').value = "seaward";
+        btnSeaward.style.backgroundColor = "var(--btn-active)";
+        btnSeaward.style.color = "#fff";
+        btnSeaward.classList.remove('opacity-75');
+        btnLandward.style.backgroundColor = "var(--bg-secondary)";
+        btnLandward.classList.add('opacity-75');
+        syncPaperView();
+      });
+
+      // GPS Fetch Simulation
+      document.getElementById('btnFetchGPS').addEventListener('click', () => {
+        const gpsStatus = document.getElementById('gpsStatus');
+        gpsStatus.textContent = "Querying satellite constellation...";
+        setTimeout(() => {
+          document.getElementById('inpLat').value = "-24.87241";
+          document.getElementById('inpLong').value = "152.48312";
+          gpsStatus.textContent = "GPS Locked: Lat -24.87241, Long 152.48312 (Accuracy: ±2.5m, WGS84)";
+          syncStateFromUI();
+          showToast("High-precision beach coordinates locked", "📡");
+        }, 600);
+      });
+
+      // Simulate Scan PIT Tag
+      document.getElementById('btnSimulateScan').addEventListener('click', () => {
+        document.getElementById('inpPITTag').value = "982000361284910";
+        syncStateFromUI();
+        showToast("PIT Tag Scanner Read: 982000361284910", "🏷️");
+      });
+
+      // Voice dictation simulation
+      document.getElementById('btnVoiceNotes').addEventListener('click', () => {
+        const notes = document.getElementById('inpNotes');
+        notes.value += (notes.value ? " " : "") + "[Voice Record 21:48] Turtle successfully laid clutch in primary dune bare sand at Innes Park. Good egg cover, no predator tracks sighted.";
+        syncStateFromUI();
+        showToast("Voice transcription appended to notes", "🎙️");
+      });
+
+      // Add Tag Row
+      document.getElementById('btnAddTagRow').addEventListener('click', () => {
+        const container = document.getElementById('tagsContainer');
+        const newDiv = document.createElement('div');
+        newDiv.className = "p-3 rounded-lg border grid grid-cols-12 gap-2 items-center";
+        newDiv.style.backgroundColor = "var(--bg-card)";
+        newDiv.style.borderColor = "var(--border)";
+        newDiv.innerHTML = `
+          <div class="col-span-3 sm:col-span-2">
+            <select class="tag-status w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+              <option value="NEW">NEW</option>
+              <option value="RECAP">RECAP</option>
+            </select>
+          </div>
+          <div class="col-span-6 sm:col-span-6">
+            <input type="text" value="" placeholder="Tag No." class="tag-number uppercase w-full touch-target rounded px-3 py-1.5 text-sm font-mono font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+          </div>
+          <div class="col-span-3 sm:col-span-4 flex items-center space-x-1">
+            <select class="tag-pos w-full touch-target rounded px-2 py-1.5 text-xs font-bold focus:outline-none" style="background-color: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-main);">
+              <option value="L2">Pos: L2</option>
+              <option value="R2">Pos: R2</option>
+              <option value="L1">Pos: L1</option>
+              <option value="R1">Pos: R1</option>
+            </select>
+          </div>
+        `;
+        container.appendChild(newDiv);
+        showToast("New titanium flipper tag row added", "➕");
+      });
+
+      // SVG Click to toggle damage
+      const turtleSvg = document.getElementById('turtleSvg');
+      turtleSvg.addEventListener('click', (e) => {
+        const target = e.target.closest('.turtle-part');
+        if (!target) return;
+        const id = target.id;
+        if (id === 'part_Carapace') {
+          const chk = document.getElementById('chkDmgCarapace');
+          chk.checked = !chk.checked;
+        } else if (id === 'part_LFF') {
+          const chk = document.getElementById('chkDmgLFF');
+          chk.checked = !chk.checked;
+        } else if (id === 'part_RFF') {
+          const chk = document.getElementById('chkDmgRFF');
+          chk.checked = !chk.checked;
+        } else if (id === 'part_LHF') {
+          const chk = document.getElementById('chkDmgLHF');
+          chk.checked = !chk.checked;
+        } else if (id === 'part_RHF') {
+          const chk = document.getElementById('chkDmgRHF');
+          chk.checked = !chk.checked;
+        }
+        syncStateFromUI();
+        updateTurtleVisuals();
+      });
+
+      // Checkbox sync to SVG
+      document.querySelectorAll('.dmg-sync').forEach(chk => {
+        chk.addEventListener('change', () => {
+          syncStateFromUI();
+          updateTurtleVisuals();
+        });
+      });
+
+      // General input change sync
+      document.getElementById('qtcpForm').addEventListener('input', () => {
+        syncStateFromUI();
+      });
+      document.getElementById('qtcpForm').addEventListener('change', () => {
+        syncStateFromUI();
+      });
+
+      // Photo upload change
+      document.getElementById('inpPhotoFile').addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          document.getElementById('photoStatusText').textContent = "Attached: " + e.target.files[0].name;
+          showToast("Tag verification photo attached", "📸");
+        }
+      });
+
+      // Export Modal
+      const modal = document.getElementById('exportModal');
+      document.getElementById('btnExportMenu').addEventListener('click', () => {
+        modal.classList.remove('hidden');
+      });
+      document.getElementById('btnCloseExport').addEventListener('click', () => {
+        modal.classList.add('hidden');
+      });
+
+      // Commit to CSV from modal
+      document.getElementById('btnCommitCurrentToCsv').addEventListener('click', () => {
+        commitCurrentRecordToShift();
+        modal.classList.add('hidden');
+      });
+
+      // Export JSON
+      document.getElementById('btnExportJSON').addEventListener('click', () => {
+        syncStateFromUI();
+        const jsonStr = JSON.stringify(formData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `QTCP_Nesting_${formData.date}_${formData.species || 'Unidentified'}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("JSON payload downloaded", "💾");
+      });
+
+      // Export Single Record CSV
+      document.getElementById('btnExportCSV').addEventListener('click', () => {
+        syncStateFromUI();
+        const recapTags = formData.tags.filter(t => t.status === "RECAP" && t.number).map(t => `${t.number}(${t.pos})`).join(';');
+        const newTags = formData.tags.filter(t => t.status === "NEW" && t.number).map(t => `${t.number}(${t.pos})`).join(';');
+        const row = [
+          formData.date,
+          formData.time ? `${formData.time} ${formData.timeMeridian}` : "",
+          `"${formData.locality}"`,
+          `"${formData.sector}"`,
+          formData.species,
+          `"${recapTags}"`,
+          `"${newTags}"`,
+          formData.pitTag,
+          formData.carapace1,
+          formData.carapace2,
+          formData.eggChambers,
+          formData.nestingActivity,
+          `"${formData.nestLocation}"`,
+          `"${formData.nestHabitat}"`,
+          formData.lat,
+          formData.long,
+          formData.nestDepthTop,
+          formData.nestDepthBottom,
+          formData.clutchRelocation,
+          formData.clutchCount,
+          `"${formData.processedBy}"`,
+          `"${formData.completedBy}"`
+        ];
+        const csvContent = CSV_HEADERS.join(',') + '\n' + row.join(',');
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `QTCP_BioCollect_${formData.date}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("BioCollect single-record CSV exported", "📊");
+      });
+
+      // Duplicate Modal Controls
+      const dupModal = document.getElementById('duplicateModal');
+      const btnConfirmReplace = document.getElementById('btnConfirmReplaceRecord');
+      const btnDiscardReplace = document.getElementById('btnDiscardReplaceRecord');
+      const btnCloseDup = document.getElementById('btnCloseDuplicateModal');
+
+      if (btnConfirmReplace) {
+        btnConfirmReplace.addEventListener('click', () => {
+          if (dupModal) dupModal.classList.add('hidden');
+          commitCurrentRecordToShift(true);
+        });
+      }
+
+      if (btnDiscardReplace) {
+        btnDiscardReplace.addEventListener('click', () => {
+          if (dupModal) dupModal.classList.add('hidden');
+          showToast("Changes to CSV log discarded.", "ℹ️");
+        });
+      }
+
+      if (btnCloseDup) {
+        btnCloseDup.addEventListener('click', () => {
+          if (dupModal) dupModal.classList.add('hidden');
+        });
+      }
+
+      if (dupModal) {
+        dupModal.addEventListener('click', (e) => {
+          if (e.target === dupModal) dupModal.classList.add('hidden');
+        });
+      }
+
+      // Printable Modal Controls
+      const printModal = document.getElementById('printableModal');
+      const closePrintModal = document.getElementById('btnClosePrintableModal');
+
+      document.getElementById('btnPrintPDF').addEventListener('click', () => {
+        modal.classList.add('hidden');
+        printModal.classList.remove('hidden');
+      });
+
+      document.getElementById('btnPrintFromPaper').addEventListener('click', () => {
+        printModal.classList.remove('hidden');
+      });
+
+      closePrintModal.addEventListener('click', () => {
+        printModal.classList.add('hidden');
+      });
+
+      // Download Standalone Printable HTML
+      document.getElementById('btnDownloadPrintableHtml').addEventListener('click', () => {
+        downloadPrintableDatasheet();
+        printModal.classList.add('hidden');
+      });
+
+      // Attempt Direct Print with graceful catch
+      document.getElementById('btnAttemptDirectPrint').addEventListener('click', () => {
+        syncStateFromUI();
+        document.getElementById('btnViewPaper').click();
+        printModal.classList.add('hidden');
+        setTimeout(() => {
+          try {
+            window.print();
+          } catch (err) {
+            showToast("Iframe sandboxing restricted direct print. Use 'Download Standalone Sheet' instead.", "⚠️");
+          }
+        }, 200);
+      });
+
+      // Load Verified Sample (Optional button in Export menu only)
+      document.getElementById('btnLoadSample').addEventListener('click', () => {
+        formData.locality = "Woongarra Coast - Innes Park Main";
+        formData.sector = "Sector 2 (South of Point)";
+        formData.species = "Loggerhead";
+        formData.carapace1 = "95.4";
+        formData.carapace2 = "95.6";
+        formData.carapaceName1 = "Dr. C. Limpus";
+        formData.carapaceName2 = "K. Debets";
+        formData.nestDepthTop = "52";
+        formData.nestDepthBottom = "72";
+        formData.clutchCount = "128";
+        formData.yolkless = "1";
+        formData.multiYolk = "0";
+        formData.nestLocation = "dune 1st";
+        formData.nestHabitat = "bare sand";
+        formData.lat = "-24.87241";
+        formData.long = "152.48312";
+        formData.nestingActivity = "laid";
+        formData.notes = "Nesting female emerged at high tide at Innes Park Main. Full egg chamber dug cleanly. All titanium flipper tags in place.";
+        
+        // Re-populate UI
+        document.getElementById('inpLocality').value = formData.locality;
+        document.getElementById('localityDisplayLabel').textContent = formData.locality;
+        document.getElementById('localityDisplayLabel').classList.remove('opacity-75');
+        document.getElementById('inpSector').value = formData.sector;
+        document.getElementById('inpSpecies').value = formData.species;
+        document.getElementById('inpCarapace1').value = formData.carapace1;
+        document.getElementById('inpCarapace2').value = formData.carapace2;
+        document.getElementById('inpCarapaceName1').value = formData.carapaceName1;
+        document.getElementById('inpCarapaceName2').value = formData.carapaceName2;
+        document.getElementById('inpDepthTop').value = formData.nestDepthTop;
+        document.getElementById('inpDepthBottom').value = formData.nestDepthBottom;
+        document.getElementById('inpClutchCount').value = formData.clutchCount;
+        document.getElementById('inpYolkless').value = formData.yolkless;
+        document.getElementById('inpNotes').value = formData.notes;
+
+        document.querySelectorAll('.species-btn').forEach(btn => {
+          if (btn.getAttribute('data-species') === "Loggerhead") {
+            btn.style.backgroundColor = "var(--btn-active)";
+            btn.style.borderColor = "var(--accent)";
+            btn.style.color = "#fff";
+          }
+        });
+        
+        syncStateFromUI();
+        modal.classList.add('hidden');
+        showToast("Loaded verified Innes Park Loggerhead nesting event", "🐢");
+      });
+
+      // Initial visual sync
+      syncStateFromUI();
+      updateTurtleVisuals();
+    });
+  </script>
+</body>
+</html>
